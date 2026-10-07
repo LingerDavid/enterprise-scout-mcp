@@ -17,7 +17,7 @@ transport:
 install:
   type: git
   url: https://github.com/LingerDavid/enterprise-scout-mcp.git
-  ref: c334af3a5fc6cf53df94981c997d166be99dbb17
+  ref: f79dfdcf7de164d44da319cf7beaa4890494f3fb
   bootstrap:
     - "python3 -m venv .venv"
     - ".venv/bin/pip install -e '.[warehouse]'"
