@@ -10,4 +10,5 @@ dist/
 config.yaml
 secrets/
 nodriver_data/
+.tmp_*
 G:/

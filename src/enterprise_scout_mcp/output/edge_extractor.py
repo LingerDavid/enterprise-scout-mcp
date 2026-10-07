@@ -19,10 +19,11 @@ NAME_KEYS = (
     "投资机构",
     "子公司",
 )
-RATIO_KEYS = ("持股比例", "投资比例", "ratio", "比例", "占股比例")
+RATIO_KEYS = ("持股比例", "投资比例", "ratio", "比例", "占股比例", "scale")
 
 SECTION_RELATION = {
     "invest": "invest",
+    "partner": "holder",
     "stockholder": "holder",
     "holder": "holder",
     "股东": "holder",

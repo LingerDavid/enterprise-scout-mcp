@@ -12,6 +12,28 @@ from enterprise_scout_mcp.output.edge_extractor import extract_edges
 from enterprise_scout_mcp.output.edge_writer import append_edges
 
 
+def test_extract_edges_enscan_partner() -> None:
+    task = CollectTask(keyword="苏州挚途", platform=Platform.AIQICHA)
+    result = CollectResult(
+        task=task,
+        channel=ChannelKind.ENSCAN_GO,
+        grade=ResultGrade.OK,
+        data={
+            "partner": [
+                {"name": "一汽解放汽车有限公司", "scale": "25.29572%"},
+                {"name": "苏州智加科技有限公司", "scale": "15.80983%"},
+            ],
+        },
+        persona_id="p1",
+    )
+    edges = extract_edges(result)
+    assert len(edges) == 2
+    assert all(e["relation"] == "holder" for e in edges)
+    assert edges[0]["src_name"] == "一汽解放汽车有限公司"
+    assert edges[0]["dst_name"] == "苏州挚途"
+    assert edges[0]["ratio"] == "25.29572%"
+
+
 def test_extract_edges_invest_and_holder() -> None:
     task = CollectTask(keyword="Acme Corp", platform=Platform.AIQICHA)
     result = CollectResult(

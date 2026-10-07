@@ -24,7 +24,7 @@ One row per successful or partial collect (`grade` in `ok`, `partial`).
 
 ## edges/equity/part.parquet
 
-Extracted from ENScan-style nested sections: `invest`, `stockholder` / `holder`, `branch`.
+Extracted from ENScan-style nested sections: `partner` / `stockholder` / `holder` (股东), `invest`, `branch`. ENScan 爱企查股东字段为 `partner`，比例字段为 `scale`。
 
 | Column | Type | Description |
 |--------|------|-------------|
