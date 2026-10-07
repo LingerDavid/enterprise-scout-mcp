@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from enterprise_scout_mcp.models import CollectResult, CollectTask, PersonaProfile
+from enterprise_scout_mcp.transport.egress import EgressContext
 
 
 class CollectionChannel(ABC):
@@ -15,5 +16,11 @@ class CollectionChannel(ABC):
         ...
 
     @abstractmethod
-    def collect(self, task: CollectTask, persona: PersonaProfile) -> CollectResult:
+    def collect(
+        self,
+        task: CollectTask,
+        persona: PersonaProfile,
+        *,
+        egress: EgressContext | None = None,
+    ) -> CollectResult:
         ...

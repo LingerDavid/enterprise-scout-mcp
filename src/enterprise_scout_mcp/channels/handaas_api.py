@@ -17,6 +17,7 @@ from enterprise_scout_mcp.models import (
     ResultGrade,
 )
 from enterprise_scout_mcp.channels.base import CollectionChannel
+from enterprise_scout_mcp.transport.egress import EgressContext
 
 
 class HandaasChannel(CollectionChannel):
@@ -52,7 +53,14 @@ class HandaasChannel(CollectionChannel):
         body = r.json()
         return body.get("data") or body.get("msgCN") or body
 
-    def collect(self, task: CollectTask, persona: PersonaProfile) -> CollectResult:
+    def collect(
+        self,
+        task: CollectTask,
+        persona: PersonaProfile,
+        *,
+        egress: EgressContext | None = None,
+    ) -> CollectResult:
+        _ = egress
         if task.platform != Platform.HANDAAS:
             return CollectResult(
                 task=task,

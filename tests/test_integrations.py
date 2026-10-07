@@ -80,6 +80,32 @@ def test_fetch_with_fallback_retries_nodriver_on_captcha(tmp_path: Path) -> None
     nodriver_run.assert_called_once()
 
 
+def test_fetch_one_passes_egress_args(tmp_path: Path) -> None:
+    from enterprise_scout_mcp.transport.egress import EgressContext
+
+    script = tmp_path / "fetch.py"
+    script.write_text("", encoding="utf-8")
+    with patch("enterprise_scout_mcp.integrations.aiqicha_runner.run_script") as run:
+        run.return_value = {"status": "ok"}
+        fetch_one(
+            "kw",
+            db_path=tmp_path / "x.db",
+            cookie_file=None,
+            script_path=script,
+            egress=EgressContext(
+                proxy_url="http://1.2.3.4:8080",
+                impersonate="chrome131",
+                user_agent="UA",
+                accept_language="zh-CN",
+            ),
+        )
+    extra = run.call_args.kwargs["extra_args"]
+    assert "--proxy" in extra
+    assert "http://1.2.3.4:8080" in extra
+    assert "--impersonate" in extra
+    assert "chrome131" in extra
+
+
 @pytest.mark.skipif(
     importlib.util.find_spec("pyarrow") is None,
     reason="pyarrow not installed",

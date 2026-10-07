@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from enterprise_scout_mcp.behavior.orchestrator import BehaviorOrchestrator
 from enterprise_scout_mcp.captcha.handler import CaptchaHandler, CaptchaStrategy
 from enterprise_scout_mcp.channels.base import CollectionChannel
@@ -19,16 +21,24 @@ from enterprise_scout_mcp.models import (
 from enterprise_scout_mcp.output.router import OutputRouter
 from enterprise_scout_mcp.persona.engine import PersonaEngine
 from enterprise_scout_mcp.routing.risk_router import RiskAwareRouter
+from enterprise_scout_mcp.state.store import StateStore
 from enterprise_scout_mcp.transport.curl_cffi_backend import CurlCffiTransport
+from enterprise_scout_mcp.transport.egress import EgressContext
 from enterprise_scout_mcp.transport.proxy_pool import ProxyPoolClient
 
 
 class CollectorScheduler:
     def __init__(self, config: AppConfig) -> None:
         self._config = config
+        root = resolve_project_root()
+        state_dir = Path(config.state_dir)
+        if not state_dir.is_absolute():
+            state_dir = root / state_dir
+        self._store = StateStore(state_dir) if config.state_persist else None
+
         self._persona = PersonaEngine(config.personas.dir)
-        self._router = RiskAwareRouter(config.routing)
-        self._behavior = BehaviorOrchestrator(config.behavior)
+        self._router = RiskAwareRouter(config.routing, store=self._store)
+        self._behavior = BehaviorOrchestrator(config.behavior, store=self._store)
         self._consistency = EnvironmentValidator()
         self._output = OutputRouter(config.output)
         self._proxy = self._build_proxy_client()
@@ -41,7 +51,7 @@ class CollectorScheduler:
             ChannelKind.ENSCAN_GO: EnsanGoChannel(config.integrations.ensan_go),
             ChannelKind.PLAYWRIGHT: PlaywrightAiqichaChannel(
                 config.integrations.playwright,
-                project_root=resolve_project_root(),
+                project_root=root,
             ),
             ChannelKind.HANDAAS_API: HandaasChannel(config.integrations.handaas),
         }
@@ -64,6 +74,16 @@ class CollectorScheduler:
                 close()
         if self._proxy is not None:
             self._proxy.close()
+
+    def _build_egress(self, persona, proxy_url: str | None) -> EgressContext:
+        curl = self._config.integrations.curl_cffi
+        headers = self._transport.build_headers(persona) if self._transport else {}
+        return EgressContext(
+            proxy_url=proxy_url,
+            impersonate=curl.impersonate if curl.enabled else None,
+            user_agent=headers.get("User-Agent") or persona.user_agent or None,
+            accept_language=headers.get("Accept-Language") or persona.locale or None,
+        )
 
     def run(self, task: CollectTask, *, persona_id: str | None = None) -> CollectResult:
         pid = persona_id or self._config.personas.default
@@ -112,8 +132,9 @@ class CollectorScheduler:
                 persona_id=pid,
             )
 
+        egress = self._build_egress(persona, proxy_url)
         self._behavior.wait_before_request(pid)
-        result = channel.collect(task, persona)
+        result = channel.collect(task, persona, egress=egress)
         result.persona_id = pid
 
         self._router.record(task.platform, channel_kind, result.grade.value)

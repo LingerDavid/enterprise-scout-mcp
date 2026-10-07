@@ -16,6 +16,7 @@ from enterprise_scout_mcp.models import (
     ResultGrade,
 )
 from enterprise_scout_mcp.channels.base import CollectionChannel
+from enterprise_scout_mcp.transport.egress import EgressContext
 
 _PLATFORM_TYPE = {
     Platform.AIQICHA: "aqc",
@@ -47,7 +48,14 @@ class EnsanGoChannel(CollectionChannel):
         except httpx.HTTPError:
             return False
 
-    def collect(self, task: CollectTask, persona: PersonaProfile) -> CollectResult:
+    def collect(
+        self,
+        task: CollectTask,
+        persona: PersonaProfile,
+        *,
+        egress: EgressContext | None = None,
+    ) -> CollectResult:
+        _ = egress
         scan_type = _PLATFORM_TYPE.get(task.platform, self._config.default_type)
         params: dict[str, Any] = {
             "name": task.keyword,

@@ -55,6 +55,7 @@ def create_mcp_server():
         platform: str = "aiqicha",
         depth: int = 1,
         stop_on_blocked: bool = False,
+        checkpoint_path: str = "",
     ) -> str:
         """Collect multiple company keywords (comma or newline separated)."""
         config = load_config()
@@ -66,6 +67,7 @@ def create_mcp_server():
                 platform=Platform(platform),
                 depth=depth,
                 stop_on_blocked=stop_on_blocked,
+                checkpoint_path=checkpoint_path or None,
             )
             return json.dumps(summary.to_dict(), ensure_ascii=False)
         finally:

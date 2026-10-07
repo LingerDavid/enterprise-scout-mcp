@@ -124,6 +124,7 @@ def cmd_collect_batch(args: argparse.Namespace) -> int:
             fields=fields,
             persona_id=args.persona,
             stop_on_blocked=args.stop_on_blocked,
+            checkpoint_path=args.checkpoint,
         )
         print(json.dumps(summary.to_dict(), ensure_ascii=False, indent=2))
         failed = summary.counts.get("error", 0) + summary.counts.get("blocked", 0)
@@ -197,6 +198,11 @@ def build_parser() -> argparse.ArgumentParser:
     batch.add_argument("--depth", type=int, default=1)
     batch.add_argument("--persona", default=None)
     batch.add_argument("--stop-on-blocked", action="store_true")
+    batch.add_argument(
+        "--checkpoint",
+        default=None,
+        help="JSON checkpoint path for resume (skip already-done keywords)",
+    )
     batch.set_defaults(func=cmd_collect_batch)
 
     neo4j = sub.add_parser("import-neo4j", help="Import warehouse parquet into Neo4j")

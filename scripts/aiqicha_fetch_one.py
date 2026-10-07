@@ -11,8 +11,6 @@ import sys
 import urllib.parse
 from pathlib import Path
 
-import httpx
-
 
 def extract_companies(html: str) -> list[dict[str, str]]:
     if "company-list" not in html:
@@ -92,20 +90,68 @@ def load_cookie_header(cookie_file: Path | None) -> dict[str, str]:
     return {"Cookie": text.replace("\n", "; ")}
 
 
-def fetch(keyword: str, cookie_file: Path | None, timeout: float) -> tuple[str, list[dict[str, str]]]:
+def _get_html(
+    url: str,
+    headers: dict[str, str],
+    *,
+    timeout: float,
+    proxy: str | None,
+    impersonate: str | None,
+) -> str:
+    if impersonate:
+        try:
+            from curl_cffi import requests as curl_requests
+        except ImportError:
+            impersonate = None
+        else:
+            proxies = {"http": proxy, "https": proxy} if proxy else None
+            resp = curl_requests.get(
+                url,
+                headers=headers,
+                proxies=proxies,
+                timeout=timeout,
+                impersonate=impersonate,
+                allow_redirects=True,
+            )
+            resp.raise_for_status()
+            return resp.text
+
+    import httpx
+
+    proxies = proxy
+    with httpx.Client(timeout=timeout, follow_redirects=True, proxy=proxies) as client:
+        resp = client.get(url, headers=headers)
+        resp.raise_for_status()
+        return resp.text
+
+
+def fetch(
+    keyword: str,
+    cookie_file: Path | None,
+    timeout: float,
+    *,
+    proxy: str | None = None,
+    impersonate: str | None = None,
+    user_agent: str | None = None,
+    accept_language: str | None = None,
+) -> tuple[str, list[dict[str, str]]]:
     url = f"https://www.aiqicha.com/s?q={urllib.parse.quote(keyword)}&t=0"
     headers = {
-        "User-Agent": (
+        "User-Agent": user_agent
+        or (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
         ),
-        "Accept-Language": "zh-CN,zh;q=0.9",
+        "Accept-Language": accept_language or "zh-CN,zh;q=0.9",
         **load_cookie_header(cookie_file),
     }
-    with httpx.Client(timeout=timeout, follow_redirects=True) as client:
-        resp = client.get(url, headers=headers)
-        resp.raise_for_status()
-        html = resp.text
+    html = _get_html(
+        url,
+        headers,
+        timeout=timeout,
+        proxy=proxy,
+        impersonate=impersonate,
+    )
     lower = html.lower()
     if "验证码" in html or "captcha" in lower or "安全验证" in html:
         return "captcha", []
@@ -121,18 +167,35 @@ def main() -> int:
     p.add_argument("--db", required=True, type=Path)
     p.add_argument("--cookie-file", type=Path, default=None)
     p.add_argument("--timeout", type=float, default=30.0)
+    p.add_argument("--proxy", default=None, help="http://host:port proxy URL")
+    p.add_argument("--impersonate", default=None, help="curl_cffi impersonate profile")
+    p.add_argument("--user-agent", default=None)
+    p.add_argument("--accept-language", default=None)
     args = p.parse_args()
 
     args.db.parent.mkdir(parents=True, exist_ok=True)
     ensure_db(args.db)
 
-    status, companies = fetch(args.keyword, args.cookie_file, args.timeout)
+    status, companies = fetch(
+        args.keyword,
+        args.cookie_file,
+        args.timeout,
+        proxy=args.proxy,
+        impersonate=args.impersonate,
+        user_agent=args.user_agent,
+        accept_language=args.accept_language,
+    )
     best = companies[0] if companies else None
+    source = "aiqicha_fetch_one"
+    if args.impersonate:
+        source = f"{source}+curl_cffi"
+    if args.proxy:
+        source = f"{source}+proxy"
     if best:
         upsert(args.db, best)
-        payload = {"status": status, "company": best, "source": "aiqicha_fetch_one"}
+        payload = {"status": status, "company": best, "source": source}
     else:
-        payload = {"status": status, "company": None, "source": "aiqicha_fetch_one"}
+        payload = {"status": status, "company": None, "source": source}
 
     print(json.dumps(payload, ensure_ascii=False))
     return 0 if status == "ok" else 1

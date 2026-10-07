@@ -103,6 +103,8 @@ class Neo4jConfig(BaseModel):
 
 class AppConfig(BaseModel):
     data_root: str = "G:/enterprise_lake"
+    state_dir: str = "./.state"
+    state_persist: bool = True
     personas: PersonasConfig = Field(default_factory=PersonasConfig)
     behavior: BehaviorConfig = Field(default_factory=BehaviorConfig)
     routing: RoutingConfig = Field(default_factory=RoutingConfig)

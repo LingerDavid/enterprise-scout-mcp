@@ -1,4 +1,4 @@
-"""Subprocess bridge: httpx fetch, nodriver fallback on captcha."""
+"""Subprocess bridge: httpx/curl_cffi fetch, nodriver fallback on captcha."""
 
 from __future__ import annotations
 
@@ -6,6 +6,8 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+
+from enterprise_scout_mcp.transport.egress import EgressContext
 
 
 def run_script(
@@ -60,6 +62,21 @@ def run_script(
     return payload
 
 
+def _egress_args(egress: EgressContext | None) -> list[str]:
+    if egress is None:
+        return []
+    args: list[str] = []
+    if egress.proxy_url:
+        args.extend(["--proxy", egress.proxy_url])
+    if egress.impersonate:
+        args.extend(["--impersonate", egress.impersonate])
+    if egress.user_agent:
+        args.extend(["--user-agent", egress.user_agent])
+    if egress.accept_language:
+        args.extend(["--accept-language", egress.accept_language])
+    return args
+
+
 def fetch_one(
     keyword: str,
     *,
@@ -67,6 +84,7 @@ def fetch_one(
     cookie_file: Path | None,
     script_path: Path,
     timeout_seconds: float = 90.0,
+    egress: EgressContext | None = None,
 ) -> dict:
     return run_script(
         script_path,
@@ -74,6 +92,7 @@ def fetch_one(
         db_path=db_path,
         cookie_file=cookie_file,
         timeout_seconds=timeout_seconds,
+        extra_args=_egress_args(egress),
     )
 
 
@@ -87,6 +106,7 @@ def fetch_with_fallback(
     nodriver_enabled: bool,
     nodriver_user_data_dir: Path | None,
     timeout_seconds: float = 90.0,
+    egress: EgressContext | None = None,
 ) -> dict:
     payload = fetch_one(
         keyword,
@@ -94,6 +114,7 @@ def fetch_with_fallback(
         cookie_file=cookie_file,
         script_path=httpx_script,
         timeout_seconds=timeout_seconds,
+        egress=egress,
     )
     if payload.get("status") != "captcha":
         return payload

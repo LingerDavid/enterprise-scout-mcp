@@ -1,9 +1,10 @@
-"""Playwright channel - DB first, httpx fetch, nodriver on captcha."""
+"""Playwright channel - DB first, curl_cffi/httpx fetch, nodriver on captcha."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
+from enterprise_scout_mcp.channels.base import CollectionChannel
 from enterprise_scout_mcp.config import PlaywrightConfig
 from enterprise_scout_mcp.integrations.aiqicha_db import lookup_company
 from enterprise_scout_mcp.integrations.aiqicha_runner import fetch_with_fallback
@@ -15,7 +16,7 @@ from enterprise_scout_mcp.models import (
     Platform,
     ResultGrade,
 )
-from enterprise_scout_mcp.channels.base import CollectionChannel
+from enterprise_scout_mcp.transport.egress import EgressContext
 
 
 class PlaywrightAiqichaChannel(CollectionChannel):
@@ -82,7 +83,13 @@ class PlaywrightAiqichaChannel(CollectionChannel):
             persona_id=persona.id,
         )
 
-    def collect(self, task: CollectTask, persona: PersonaProfile) -> CollectResult:
+    def collect(
+        self,
+        task: CollectTask,
+        persona: PersonaProfile,
+        *,
+        egress: EgressContext | None = None,
+    ) -> CollectResult:
         if task.platform != Platform.AIQICHA:
             return CollectResult(
                 task=task,
@@ -124,5 +131,6 @@ class PlaywrightAiqichaChannel(CollectionChannel):
             nodriver_enabled=self._config.nodriver_on_captcha,
             nodriver_user_data_dir=self._resolve(self._config.nodriver_user_data_dir),
             timeout_seconds=self._config.fetch_timeout_seconds,
+            egress=egress,
         )
         return self._result_from_payload(task, persona, payload, db_path)

@@ -68,7 +68,7 @@ enterprise-scout-mcp streamable-http  # HTTP :8000
 escout doctor
 escout personas
 escout collect 小米 -p aiqicha
-escout collect-batch --file keywords.txt -p aiqicha
+escout collect-batch --file keywords.txt -p aiqicha --checkpoint .state/batch.json
 escout import-neo4j --dry-run    # 统计 warehouse 行数
 escout import-neo4j              # 写入 Neo4j（需 pip install -e ".[graph]"）
 escout sync-cookies --from-file ./secrets/aiqicha_cookies.txt
@@ -78,7 +78,9 @@ escout smoke-sidecars           # 仅 sidecar 探活（CI/脚本用）
 escout smoke-collect 小米       # 实机采集冒烟（需 ENScan 运行）
 ```
 
-DB 未命中时，`playwright.fetch_on_miss` 会调用 `scripts/aiqicha_fetch_one.py`（httpx + cookie）抓取并 upsert 到 `companies.db`。若 httpx 返回验证码，且 `nodriver_on_captcha: true`，自动回退到 `scripts/aiqicha_fetch_nodriver.py`。
+DB 未命中时，`playwright.fetch_on_miss` 会调用 `scripts/aiqicha_fetch_one.py`（优先 curl_cffi TLS impersonate + 可选 proxy，否则 httpx）抓取并 upsert 到 `companies.db`。若返回验证码且 `nodriver_on_captcha: true`，回退到 `scripts/aiqicha_fetch_nodriver.py`。
+
+`state_persist: true` 时，日配额与路由成功率写入 `state_dir`（默认 `./.state/`）。`collect-batch --checkpoint` 支持断点续跑。
 
 ## Warehouse 输出
 

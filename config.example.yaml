@@ -1,6 +1,8 @@
 # Copy to config.yaml and adjust paths to sibling projects on your machine.
 
 data_root: "G:/enterprise_lake"
+state_dir: "./.state"
+state_persist: true  # persist daily quotas + routing success rates
 
 personas:
   dir: "./personas"
@@ -15,7 +17,7 @@ behavior:
   cooldown_after_block_seconds: 1800
 
 routing:
-  # Platform success-rate window (in-memory; persist later)
+  # Platform success-rate window (persisted under state_dir when state_persist=true)
   min_success_rate_for_enscan: 0.6
   prefer_enscan_for: ["icp", "app", "wechat", "invest", "branch"]
   force_playwright_for: ["js_challenge", "login_required", "captcha"]
