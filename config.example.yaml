@@ -17,13 +17,14 @@ behavior:
   cooldown_after_block_seconds: 1800
 
 routing:
-  # Platform success-rate window (persisted under state_dir when state_persist=true)
-  min_success_rate_for_enscan: 0.6
-  prefer_enscan_for: ["icp", "app", "wechat", "invest", "branch"]
-  force_playwright_for: ["js_challenge", "login_required", "captcha"]
+  # All registry platforms (aiqicha / tianyancha / …) go through ENScan only.
+  ensan_only: true
+  min_success_rate_for_enscan: 0.0
+  prefer_enscan_for: ["icp", "app", "wechat", "invest", "branch", "partner", "holds"]
+  force_playwright_for: []
 
 integrations:
-  # ENScan_GO — sibling checkout: e:/Project/ENScan_GO
+  # ENScan_GO — sibling checkout: e:/Project/ENScan_GO (required when ensan_only)
   ensan_go:
     enabled: true
     base_url: "http://127.0.0.1:31000"
@@ -31,35 +32,34 @@ integrations:
     timeout_seconds: 120
     config_path: "../ENScan_GO/config.yaml"
 
-  # proxy_pool — sibling checkout: e:/Project/proxy_pool (docker compose)
+  # proxy_pool — unused under ensan_only (ENScan owns egress)
   proxy_pool:
     enabled: false
     base_url: "http://127.0.0.1:5010"
 
-  # Handaas MCP-style API — sibling: e:/Project/enterprise-mcp-server
+  # Handaas API — optional paid complement, not a scrape fallback
   handaas:
     enabled: false
     integrator_id: ""
     secret_id: ""
     secret_key: ""
 
-  # Playwright / nodriver channel — patterns from aiqicha_scraper
+  # Interactive scrape channel — disabled; kept for optional force_channel only
   playwright:
-    enabled: true
+    enabled: false
     headless: true
     cookie_file: "./secrets/aiqicha_cookies.txt"
     aiqicha_scraper_dir: "../aiqicha_scraper"
     companies_db: "../aiqicha_scraper/companies.db"
-    fetch_on_miss: true
+    fetch_on_miss: false
     fetch_script: "./scripts/aiqicha_fetch_one.py"
     nodriver_script: "./scripts/aiqicha_fetch_nodriver.py"
-    nodriver_on_captcha: true
+    nodriver_on_captcha: false
     nodriver_user_data_dir: "./nodriver_data"
     fetch_timeout_seconds: 90
 
-  # curl_cffi disguise — Scrapling-style TLS impersonation
   curl_cffi:
-    enabled: true
+    enabled: false
     impersonate: "chrome131"
 
 output:

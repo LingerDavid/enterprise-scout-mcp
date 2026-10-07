@@ -78,7 +78,7 @@ escout smoke-sidecars           # 仅 sidecar 探活（CI/脚本用）
 escout smoke-collect 小米       # 实机采集冒烟（需 ENScan 运行）
 ```
 
-DB 未命中时，`playwright.fetch_on_miss` 会调用 `scripts/aiqicha_fetch_one.py`（优先 curl_cffi TLS impersonate + 可选 proxy，否则 httpx）抓取并 upsert 到 `companies.db`。若返回验证码且 `nodriver_on_captcha: true`，回退到 `scripts/aiqicha_fetch_nodriver.py`。
+**采集策略：只走 ENScan。** `routing.ensan_only: true`（默认）时，爱企查 / 天眼查 / 快查 / 风鸟一律经 ENScan_GO `:31000`，不做 Playwright/httpx/nodriver 页面直采回退。ENScan 不可用时直接报错。天眼查：`escout collect 关键词 -p tianyancha`（需在 ENScan `config.yaml` 配置 TYC cookie）。
 
 `state_persist: true` 时，日配额与路由成功率写入 `state_dir`（默认 `./.state/`）。`collect-batch --checkpoint` 支持断点续跑。
 
@@ -100,12 +100,11 @@ DB 未命中时，`playwright.fetch_on_miss` 会调用 `scripts/aiqicha_fetch_on
 MCP (enterprise-scout-mcp)
   └─ CollectorScheduler
        ├─ PersonaEngine
-       ├─ RiskAwareRouter
+       ├─ RiskAwareRouter     ← ensan_only: registry → ENScan only
        ├─ BehaviorOrchestrator
        ├─ EnvironmentValidator
-       ├─ EnsanGoChannel      ← ENScan_GO :31000
-       ├─ PlaywrightChannel   ← aiqicha_scraper 模式
-       └─ HandaasChannel      ← enterprise-mcp-server 签名
+       ├─ EnsanGoChannel      ← ENScan_GO :31000 (primary)
+       └─ HandaasChannel      ← optional paid API (not scrape fallback)
 ```
 
 ## Sidecar

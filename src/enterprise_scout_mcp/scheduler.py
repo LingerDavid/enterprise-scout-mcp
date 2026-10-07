@@ -99,12 +99,21 @@ class CollectorScheduler:
                 persona_id=pid,
             )
 
-        channel_kind = self._router.select_channel(
-            task,
-            ensan_available=self._channels[ChannelKind.ENSCAN_GO].available(),
-            playwright_available=self._channels[ChannelKind.PLAYWRIGHT].available(),
-            handaas_available=self._channels[ChannelKind.HANDAAS_API].available(),
-        )
+        try:
+            channel_kind = self._router.select_channel(
+                task,
+                ensan_available=self._channels[ChannelKind.ENSCAN_GO].available(),
+                playwright_available=self._channels[ChannelKind.PLAYWRIGHT].available(),
+                handaas_available=self._channels[ChannelKind.HANDAAS_API].available(),
+            )
+        except RuntimeError as exc:
+            return CollectResult(
+                task=task,
+                channel=ChannelKind.ENSCAN_GO,
+                grade=ResultGrade.ERROR,
+                message=str(exc),
+                persona_id=pid,
+            )
         channel = self._channels[channel_kind]
 
         proxy_url: str | None = None

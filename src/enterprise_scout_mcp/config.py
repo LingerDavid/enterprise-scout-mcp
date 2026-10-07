@@ -44,7 +44,7 @@ class PlaywrightConfig(BaseModel):
 
 
 class CurlCffiConfig(BaseModel):
-    enabled: bool = True
+    enabled: bool = False
     impersonate: str = "chrome131"
 
 
@@ -71,13 +71,14 @@ class BehaviorConfig(BaseModel):
 
 
 class RoutingConfig(BaseModel):
-    min_success_rate_for_enscan: float = 0.6
+    # Registry platforms (aiqicha/tianyancha/…) always use ENScan; no interactive scrape fallback.
+    ensan_only: bool = True
+    min_success_rate_for_enscan: float = 0.0
     prefer_enscan_for: list[str] = Field(
-        default_factory=lambda: ["icp", "app", "wechat", "invest", "branch"]
+        default_factory=lambda: ["icp", "app", "wechat", "invest", "branch", "partner", "holds"]
     )
-    force_playwright_for: list[str] = Field(
-        default_factory=lambda: ["js_challenge", "login_required", "captcha"]
-    )
+    # Unused when ensan_only=true; kept for optional force_channel experiments.
+    force_playwright_for: list[str] = Field(default_factory=list)
 
 
 class OutputConfig(BaseModel):
