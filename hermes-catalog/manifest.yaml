@@ -5,7 +5,7 @@ manifest_version: 1
 
 name: enterprise-scout-mcp
 description: Orchestrated enterprise registry intelligence (ENScan, aiqicha, Handaas).
-source: https://github.com/YOUR_ORG/enterprise-scout-mcp
+source: https://github.com/LingerDavid/enterprise-scout-mcp
 
 transport:
   type: stdio
@@ -16,8 +16,8 @@ transport:
 
 install:
   type: git
-  url: https://github.com/YOUR_ORG/enterprise-scout-mcp.git
-  ref: REPLACE_WITH_40_CHAR_COMMIT_SHA
+  url: https://github.com/LingerDavid/enterprise-scout-mcp.git
+  ref: c334af3a5fc6cf53df94981c997d166be99dbb17
   bootstrap:
     - "python3 -m venv .venv"
     - ".venv/bin/pip install -e '.[warehouse]'"

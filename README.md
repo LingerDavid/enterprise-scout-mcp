@@ -1,5 +1,7 @@
 # enterprise-scout-mcp
 
+[![test](https://github.com/LingerDavid/enterprise-scout-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/LingerDavid/enterprise-scout-mcp/actions/workflows/test.yml)
+
 企业工商/穿透情报 **MCP 服务**。Python 编排层（人设、风控路由、行为配额）+ 多通道采集，输出到 [EnterpriseLake](../EnterpriseLake) `G:/enterprise_lake/`。
 
 与 `enterprise-mcp-server`（Handaas 单源 API）互补：本服务编排 ENScan_GO / Playwright / 本地通道。
