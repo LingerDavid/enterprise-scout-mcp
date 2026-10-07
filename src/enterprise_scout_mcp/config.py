@@ -37,6 +37,9 @@ class PlaywrightConfig(BaseModel):
     companies_db: str = "../aiqicha_scraper/companies.db"
     fetch_on_miss: bool = True
     fetch_script: str = "./scripts/aiqicha_fetch_one.py"
+    nodriver_script: str = "./scripts/aiqicha_fetch_nodriver.py"
+    nodriver_on_captcha: bool = True
+    nodriver_user_data_dir: str = "./nodriver_data"
     fetch_timeout_seconds: float = 90.0
 
 

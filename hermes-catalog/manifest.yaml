@@ -1,0 +1,34 @@
+# Proposed Hermes optional-mcp catalog entry (PR to hermes-agent/optional-mcps/).
+manifest_version: 1
+
+name: enterprise-scout-mcp
+description: Orchestrated enterprise registry intelligence (ENScan, aiqicha, Handaas).
+source: file:///E:/Project/enterprise-scout-mcp
+
+transport:
+  type: stdio
+  command: "${INSTALL_DIR}/.venv/Scripts/enterprise-scout-mcp.exe"
+  args: []
+
+install:
+  type: local
+  path: "${INSTALL_DIR}"
+  bootstrap:
+    - "python -m venv .venv"
+    - ".venv/Scripts/pip install -e ."
+
+auth:
+  type: none
+
+post_install: |
+  Copy config.example.yaml to config.yaml and set ENScan / cookie paths.
+  Run `escout sync-cookies` after exporting aiqicha cookies.
+  Start a new Hermes session to load enterprise_collect / scout_doctor tools.
+
+suggest:
+  keywords:
+    - enterprise
+    - 工商
+    - 股权穿透
+    - aiqicha
+    - enscan

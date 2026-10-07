@@ -1,4 +1,4 @@
-"""Output grading router 鈥?ok 鈫?warehouse, partial 鈫?raw, captcha 鈫?retry queue."""
+"""Output grading router — ok → warehouse, partial → raw, captcha → retry queue."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from pathlib import Path
 
 from enterprise_scout_mcp.config import OutputConfig
 from enterprise_scout_mcp.models import CollectResult, ResultGrade
+from enterprise_scout_mcp.output.edge_writer import append_edges
 from enterprise_scout_mcp.output.parquet_writer import append_entity
 
 
@@ -42,5 +43,7 @@ class OutputRouter:
         }
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         if self._config.parquet_enabled:
-            append_entity(result, Path(self._config.warehouse_dir))
+            wh = Path(self._config.warehouse_dir)
+            append_entity(result, wh)
+            append_edges(result, wh)
         return path

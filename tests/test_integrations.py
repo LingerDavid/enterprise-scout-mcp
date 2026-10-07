@@ -11,7 +11,7 @@ import pytest
 from unittest.mock import patch
 
 from enterprise_scout_mcp.integrations.aiqicha_db import lookup_company
-from enterprise_scout_mcp.integrations.aiqicha_runner import fetch_one
+from enterprise_scout_mcp.integrations.aiqicha_runner import fetch_one, fetch_with_fallback
 from enterprise_scout_mcp.integrations.enscan_cookies import sync_aiqicha_to_enscan
 from enterprise_scout_mcp.models import ChannelKind, CollectResult, CollectTask, Platform, ResultGrade
 from enterprise_scout_mcp.output.parquet_writer import append_entity
@@ -53,6 +53,31 @@ def test_fetch_one_parses_json(tmp_path: Path) -> None:
         payload = fetch_one("test", db_path=tmp_path / "x.db", cookie_file=None, script_path=script)
     assert payload["status"] == "ok"
     assert payload["company"]["aiqicha_id"] == "9"
+
+
+def test_fetch_with_fallback_retries_nodriver_on_captcha(tmp_path: Path) -> None:
+    httpx_script = tmp_path / "httpx.py"
+    nodriver_script = tmp_path / "nodriver.py"
+    httpx_script.write_text("", encoding="utf-8")
+    nodriver_script.write_text("", encoding="utf-8")
+
+    with patch("enterprise_scout_mcp.integrations.aiqicha_runner.fetch_one") as httpx_fetch:
+        with patch("enterprise_scout_mcp.integrations.aiqicha_runner.run_script") as nodriver_run:
+            httpx_fetch.return_value = {"status": "captcha"}
+            nodriver_run.return_value = {"status": "ok", "company": {"aiqicha_id": "42"}}
+            payload = fetch_with_fallback(
+                "test",
+                db_path=tmp_path / "x.db",
+                cookie_file=None,
+                httpx_script=httpx_script,
+                nodriver_script=nodriver_script,
+                nodriver_enabled=True,
+                nodriver_user_data_dir=tmp_path / "nd",
+                timeout_seconds=30.0,
+            )
+    assert payload["status"] == "ok"
+    assert payload["company"]["aiqicha_id"] == "42"
+    nodriver_run.assert_called_once()
 
 
 @pytest.mark.skipif(

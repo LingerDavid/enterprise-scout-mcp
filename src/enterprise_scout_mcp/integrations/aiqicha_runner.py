@@ -1,4 +1,4 @@
-"""Subprocess bridge to scripts/aiqicha_fetch_one.py on DB miss."""
+"""Subprocess bridge: httpx fetch, nodriver fallback on captcha."""
 
 from __future__ import annotations
 
@@ -8,13 +8,14 @@ import sys
 from pathlib import Path
 
 
-def fetch_one(
+def run_script(
+    script_path: Path,
     keyword: str,
     *,
     db_path: Path,
     cookie_file: Path | None,
-    script_path: Path,
-    timeout_seconds: float = 90.0,
+    timeout_seconds: float,
+    extra_args: list[str] | None = None,
 ) -> dict:
     if not script_path.is_file():
         return {"status": "error", "message": f"fetch script missing: {script_path}"}
@@ -26,10 +27,12 @@ def fetch_one(
         "--db",
         str(db_path),
         "--timeout",
-        str(min(timeout_seconds, 60.0)),
+        str(min(timeout_seconds, 120.0)),
     ]
     if cookie_file and cookie_file.is_file():
         cmd.extend(["--cookie-file", str(cookie_file)])
+    if extra_args:
+        cmd.extend(extra_args)
 
     try:
         proc = subprocess.run(
@@ -55,3 +58,57 @@ def fetch_one(
 
     payload["exit_code"] = proc.returncode
     return payload
+
+
+def fetch_one(
+    keyword: str,
+    *,
+    db_path: Path,
+    cookie_file: Path | None,
+    script_path: Path,
+    timeout_seconds: float = 90.0,
+) -> dict:
+    return run_script(
+        script_path,
+        keyword,
+        db_path=db_path,
+        cookie_file=cookie_file,
+        timeout_seconds=timeout_seconds,
+    )
+
+
+def fetch_with_fallback(
+    keyword: str,
+    *,
+    db_path: Path,
+    cookie_file: Path | None,
+    httpx_script: Path,
+    nodriver_script: Path | None,
+    nodriver_enabled: bool,
+    nodriver_user_data_dir: Path | None,
+    timeout_seconds: float = 90.0,
+) -> dict:
+    payload = fetch_one(
+        keyword,
+        db_path=db_path,
+        cookie_file=cookie_file,
+        script_path=httpx_script,
+        timeout_seconds=timeout_seconds,
+    )
+    if payload.get("status") != "captcha":
+        return payload
+    if not nodriver_enabled or nodriver_script is None or not nodriver_script.is_file():
+        return payload
+
+    extra: list[str] = []
+    if nodriver_user_data_dir is not None:
+        extra.extend(["--user-data-dir", str(nodriver_user_data_dir)])
+
+    return run_script(
+        nodriver_script,
+        keyword,
+        db_path=db_path,
+        cookie_file=cookie_file,
+        timeout_seconds=max(timeout_seconds, 120.0),
+        extra_args=extra,
+    )

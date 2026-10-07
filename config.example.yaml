@@ -50,6 +50,9 @@ integrations:
     companies_db: "../aiqicha_scraper/companies.db"
     fetch_on_miss: true
     fetch_script: "./scripts/aiqicha_fetch_one.py"
+    nodriver_script: "./scripts/aiqicha_fetch_nodriver.py"
+    nodriver_on_captcha: true
+    nodriver_user_data_dir: "./nodriver_data"
     fetch_timeout_seconds: 90
 
   # curl_cffi disguise — Scrapling-style TLS impersonation

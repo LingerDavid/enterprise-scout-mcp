@@ -18,6 +18,7 @@ transport = [
 ]
 browser = [
     "playwright>=1.49.0,<2",
+    "nodriver>=0.38,<1",
 ]
 warehouse = [
     "pyarrow>=18.0.0,<22",
