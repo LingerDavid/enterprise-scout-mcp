@@ -1,4 +1,4 @@
-"""Environment consistency 鈥?persona features must align before egress."""
+"""Environment consistency — persona features must align before egress."""
 
 from __future__ import annotations
 

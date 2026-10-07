@@ -1,4 +1,4 @@
-"""Core orchestrator 鈥?persona 鈫?route 鈫?behavior 鈫?consistency 鈫?channel 鈫?output."""
+"""Core orchestrator — persona → route → behavior → consistency → channel → output."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from enterprise_scout_mcp.channels.base import CollectionChannel
 from enterprise_scout_mcp.channels.ensan_go import EnsanGoChannel
 from enterprise_scout_mcp.channels.handaas_api import HandaasChannel
 from enterprise_scout_mcp.channels.playwright_aiqicha import PlaywrightAiqichaChannel
-from enterprise_scout_mcp.config import AppConfig
+from enterprise_scout_mcp.config import AppConfig, resolve_project_root
 from enterprise_scout_mcp.consistency.validator import EnvironmentValidator
 from enterprise_scout_mcp.models import (
     ChannelKind,
@@ -38,7 +38,10 @@ class CollectorScheduler:
 
         self._channels: dict[ChannelKind, CollectionChannel] = {
             ChannelKind.ENSCAN_GO: EnsanGoChannel(config.integrations.ensan_go),
-            ChannelKind.PLAYWRIGHT: PlaywrightAiqichaChannel(config.integrations.playwright),
+            ChannelKind.PLAYWRIGHT: PlaywrightAiqichaChannel(
+                config.integrations.playwright,
+                project_root=resolve_project_root(),
+            ),
             ChannelKind.HANDAAS_API: HandaasChannel(config.integrations.handaas),
         }
         self._transport = (

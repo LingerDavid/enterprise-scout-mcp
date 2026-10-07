@@ -1,4 +1,4 @@
-"""Handaas enterprise API 鈥?same signing contract as enterprise-mcp-server."""
+"""Handaas enterprise API — same signing contract as enterprise-mcp-server."""
 
 from __future__ import annotations
 
@@ -59,10 +59,13 @@ class HandaasChannel(CollectionChannel):
                 persona_id=persona.id,
             )
         try:
-            data = self._call(
-                "enterprise_get_enterprise_base_info",
-                {"keyword": task.keyword},
-            )
+            if task.depth == 0:
+                product_id = "enterprise_get_keyword_search"
+                params = {"matchKeyword": task.keyword, "pageSize": 10}
+            else:
+                product_id = "enterprise_get_enterprise_base_info"
+                params = {"keyword": task.keyword}
+            data = self._call(product_id, params)
             grade = ResultGrade.OK if data else ResultGrade.PARTIAL
             return CollectResult(
                 task=task,

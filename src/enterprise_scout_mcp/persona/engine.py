@@ -1,4 +1,4 @@
-"""Persona engine 鈥?device + network + behavior bound as one virtual identity."""
+"""Persona engine — device + network + behavior bound as one virtual identity."""
 
 from __future__ import annotations
 

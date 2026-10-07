@@ -18,7 +18,8 @@
 cd E:\Project\enterprise-scout-mcp
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
+pip install -e ".[dev,warehouse]"
+# 浏览器回退（可选）: pip install -e ".[browser]"
 
 copy config.example.yaml config.yaml
 enterprise-scout-mcp                    # stdio（Cursor / Hermes 默认）
@@ -66,7 +67,17 @@ escout sync-cookies --from-file ./secrets/aiqicha_cookies.txt
 escout register-hermes          # 写入 ~/.hermes/config.yaml
 ```
 
-DB 未命中时，`playwright.fetch_on_miss` 会调用 `scripts/aiqicha_fetch_one.py`（httpx + cookie）抓取并 upsert 到 `companies.db`。
+DB 未命中时，`playwright.fetch_on_miss` 会调用 `scripts/aiqicha_fetch_one.py`（httpx + cookie）抓取并 upsert 到 `companies.db`。若 httpx 返回验证码，且 `nodriver_on_captcha: true`，自动回退到 `scripts/aiqicha_fetch_nodriver.py`。
+
+## Warehouse 输出
+
+`output.parquet_enabled: true` 时写入 EnterpriseLake：
+
+| 路径 | 内容 |
+|------|------|
+| `warehouse/entities/part.parquet` | 企业实体行 |
+| `warehouse/edges/equity/part.parquet` | 股权/投资/分支边（来自 ENScan invest/stockholder/branch） |
+| `raw/` / `raw/retry_queue/` | partial / captcha 分级 JSON |
 
 ## 架构
 

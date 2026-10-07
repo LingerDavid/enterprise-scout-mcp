@@ -1,4 +1,4 @@
-"""Channel ABC 鈥?ENScan_GO batch vs Playwright interactive."""
+"""Channel ABC — ENScan_GO batch vs Playwright interactive."""
 
 from __future__ import annotations
 

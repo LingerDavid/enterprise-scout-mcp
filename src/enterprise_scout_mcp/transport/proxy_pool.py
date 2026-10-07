@@ -1,4 +1,4 @@
-"""proxy_pool HTTP client 鈥?GET /get, /pop, /delete."""
+"""proxy_pool HTTP client — GET /get, /pop, /delete."""
 
 from __future__ import annotations
 

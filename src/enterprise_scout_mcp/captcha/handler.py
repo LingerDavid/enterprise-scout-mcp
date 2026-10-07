@@ -1,4 +1,4 @@
-"""Captcha branch 鈥?classify signal, optional solver hook, rotate IP on trigger."""
+"""Captcha branch — classify signal, optional solver hook, rotate IP on trigger."""
 
 from __future__ import annotations
 

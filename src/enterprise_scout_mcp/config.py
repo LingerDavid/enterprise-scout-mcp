@@ -103,15 +103,30 @@ class AppConfig(BaseModel):
     output: OutputConfig = Field(default_factory=OutputConfig)
 
 
-def load_config(path: str | Path | None = None) -> AppConfig:
-    candidates = [
-        Path(path) if path else None,
-        Path("config.yaml"),
-        Path(__file__).resolve().parents[2] / "config.yaml",
+def _config_candidates(path: str | Path | None) -> list[Path]:
+    return [
+        p
+        for p in (
+            Path(path) if path else None,
+            Path("config.yaml"),
+            Path(__file__).resolve().parents[2] / "config.yaml",
+        )
+        if p is not None
     ]
+
+
+def resolve_project_root(path: str | Path | None = None) -> Path:
+    """Directory containing config.yaml, else cwd."""
+    for candidate in _config_candidates(path):
+        if candidate.is_file():
+            return candidate.parent
+    return Path.cwd()
+
+
+def load_config(path: str | Path | None = None) -> AppConfig:
     raw: dict[str, Any] = {}
-    for candidate in candidates:
-        if candidate and candidate.is_file():
+    for candidate in _config_candidates(path):
+        if candidate.is_file():
             raw = yaml.safe_load(candidate.read_text(encoding="utf-8")) or {}
             break
     return AppConfig.model_validate(raw)

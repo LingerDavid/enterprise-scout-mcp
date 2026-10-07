@@ -1,4 +1,4 @@
-"""Behavior orchestrator 鈥?quotas, cooldowns, dynamic delay."""
+"""Behavior orchestrator - quotas, cooldowns, dynamic delay."""
 
 from __future__ import annotations
 

@@ -9,8 +9,9 @@ import sys
 from pathlib import Path
 
 from enterprise_scout_mcp.config import load_config
+from enterprise_scout_mcp.diagnostics.doctor import build_doctor_report
 from enterprise_scout_mcp.integrations.enscan_cookies import sync_aiqicha_to_enscan
-from enterprise_scout_mcp.models import ChannelKind, CollectTask, Platform
+from enterprise_scout_mcp.models import CollectTask, Platform
 from enterprise_scout_mcp.persona.engine import PersonaEngine
 from enterprise_scout_mcp.scheduler import CollectorScheduler
 
@@ -57,13 +58,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     scheduler = CollectorScheduler(config)
     try:
-        checks = {
-            "ensan_go": scheduler._channels[ChannelKind.ENSCAN_GO].available(),
-            "playwright": scheduler._channels[ChannelKind.PLAYWRIGHT].available(),
-            "handaas": scheduler._channels[ChannelKind.HANDAAS_API].available(),
-            "personas": scheduler._persona.list_ids(),
-        }
-        print(json.dumps(checks, ensure_ascii=False, indent=2))
+        print(json.dumps(build_doctor_report(scheduler, config), ensure_ascii=False, indent=2))
         return 0
     finally:
         scheduler.close()

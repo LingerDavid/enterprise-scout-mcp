@@ -1,4 +1,4 @@
-"""ENScan_GO HTTP API adapter 鈥?fast batch channel."""
+"""ENScan_GO HTTP API adapter — fast batch channel."""
 
 from __future__ import annotations
 

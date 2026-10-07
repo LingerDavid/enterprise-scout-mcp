@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from enterprise_scout_mcp.models import CollectResult
+from enterprise_scout_mcp.output.edge_schema import edge_row
 
 NAME_KEYS = (
     "企业名称",
@@ -66,17 +67,17 @@ def extract_edges(result: CollectResult) -> list[dict[str, Any]]:
             else:
                 src, dst = root, name
             edges.append(
-                {
-                    "src_name": src,
-                    "dst_name": dst,
-                    "relation": relation,
-                    "ratio": ratio,
-                    "section": str(section),
-                    "platform": result.task.platform.value,
-                    "source_channel": result.channel.value,
-                    "query_keyword": root,
-                    "collected_at": ts,
-                    "payload_json": json.dumps(row, ensure_ascii=False),
-                }
+                edge_row(
+                    src_name=src,
+                    dst_name=dst,
+                    relation=relation,
+                    ratio=ratio,
+                    section=str(section),
+                    platform=result.task.platform.value,
+                    source_channel=result.channel.value,
+                    query_keyword=root,
+                    collected_at=ts,
+                    payload_json=json.dumps(row, ensure_ascii=False),
+                )
             )
     return edges

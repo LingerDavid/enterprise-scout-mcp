@@ -8,8 +8,9 @@ import sys
 from pathlib import Path
 
 from enterprise_scout_mcp.config import load_config
+from enterprise_scout_mcp.diagnostics.doctor import build_doctor_report
 from enterprise_scout_mcp.integrations.enscan_cookies import sync_aiqicha_to_enscan
-from enterprise_scout_mcp.models import ChannelKind, CollectTask, Platform
+from enterprise_scout_mcp.models import CollectTask, Platform
 from enterprise_scout_mcp.scheduler import CollectorScheduler
 
 
@@ -65,13 +66,11 @@ def create_mcp_server():
         config = load_config()
         scheduler = CollectorScheduler(config)
         try:
-            payload = {
-                "ensan_go": scheduler._channels[ChannelKind.ENSCAN_GO].available(),
-                "playwright": scheduler._channels[ChannelKind.PLAYWRIGHT].available(),
-                "handaas": scheduler._channels[ChannelKind.HANDAAS_API].available(),
-                "personas": scheduler._persona.list_ids(),
-            }
-            return json.dumps(payload, ensure_ascii=False, indent=2)
+            return json.dumps(
+                build_doctor_report(scheduler, config),
+                ensure_ascii=False,
+                indent=2,
+            )
         finally:
             scheduler.close()
 

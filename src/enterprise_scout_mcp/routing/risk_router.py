@@ -1,4 +1,4 @@
-"""Risk-aware routing 鈥?pick channel from platform stats + task shape."""
+"""Risk-aware routing — pick channel from platform stats + task shape."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ class RiskAwareRouter:
         if task.force_channel:
             return task.force_channel
 
-        # Explicit platform 鈫?ENScan mapping (mirrors ENScan_GO -type flag)
+        # Explicit platform → ENScan mapping (mirrors ENScan_GO -type flag)
         if task.platform in (Platform.AIQICHA, Platform.TIANYANCHA, Platform.KUAICHA, Platform.RISKBIRD):
             ensan_stats = self.stats_for(task.platform, ChannelKind.ENSCAN_GO)
             if ensan_available and ensan_stats.success_rate >= self._config.min_success_rate_for_enscan:
