@@ -41,6 +41,10 @@ class RiskAwareRouter:
         if task.force_channel:
             return task.force_channel
 
+        force_pw = set(self._config.force_playwright_for)
+        if force_pw.intersection(task.fields) and playwright_available:
+            return ChannelKind.PLAYWRIGHT
+
         # Explicit platform → ENScan mapping (mirrors ENScan_GO -type flag)
         if task.platform in (Platform.AIQICHA, Platform.TIANYANCHA, Platform.KUAICHA, Platform.RISKBIRD):
             ensan_stats = self.stats_for(task.platform, ChannelKind.ENSCAN_GO)

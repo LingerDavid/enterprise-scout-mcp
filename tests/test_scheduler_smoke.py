@@ -1,4 +1,4 @@
-"""Smoke tests ? routing, behavior gates, consistency (no live network)."""
+"""Smoke tests - routing, behavior gates, consistency (no live network)."""
 
 from __future__ import annotations
 
@@ -7,6 +7,18 @@ from enterprise_scout_mcp.config import AppConfig, BehaviorConfig, RoutingConfig
 from enterprise_scout_mcp.consistency.validator import EnvironmentValidator
 from enterprise_scout_mcp.models import ChannelKind, CollectTask, PersonaProfile, Platform
 from enterprise_scout_mcp.routing.risk_router import RiskAwareRouter
+
+
+def test_router_force_playwright_for_captcha_fields():
+    router = RiskAwareRouter(RoutingConfig())
+    task = CollectTask(keyword="x", platform=Platform.AIQICHA, fields=("captcha",))
+    channel = router.select_channel(
+        task,
+        ensan_available=True,
+        playwright_available=True,
+        handaas_available=False,
+    )
+    assert channel == ChannelKind.PLAYWRIGHT
 
 
 def test_router_prefers_enscan_for_bulk_fields():

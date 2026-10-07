@@ -10,6 +10,7 @@ from pathlib import Path
 
 from enterprise_scout_mcp.config import load_config
 from enterprise_scout_mcp.diagnostics.doctor import build_doctor_report
+from enterprise_scout_mcp.diagnostics.sidecars import build_sidecar_report
 from enterprise_scout_mcp.integrations.enscan_cookies import sync_aiqicha_to_enscan
 from enterprise_scout_mcp.models import CollectTask, Platform
 from enterprise_scout_mcp.persona.engine import PersonaEngine
@@ -58,10 +59,26 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     scheduler = CollectorScheduler(config)
     try:
-        print(json.dumps(build_doctor_report(scheduler, config), ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                build_doctor_report(scheduler, config, probe_sidecars=args.probe),
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         return 0
     finally:
         scheduler.close()
+
+
+def cmd_smoke_sidecars(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    report = build_sidecar_report(config, timeout=args.timeout)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    ensan_ok = report["ensan_go"].get("ok", False)
+    proxy_cfg = report["proxy_pool"]
+    proxy_ok = proxy_cfg.get("skipped") or proxy_cfg.get("reachable", False)
+    return 0 if ensan_ok and proxy_ok else 1
 
 
 def cmd_personas(_args: argparse.Namespace) -> int:
@@ -107,7 +124,16 @@ def build_parser() -> argparse.ArgumentParser:
     collect.set_defaults(func=cmd_collect)
 
     doctor = sub.add_parser("doctor", help="Check integration availability")
+    doctor.add_argument(
+        "--probe",
+        action="store_true",
+        help="Live-probe ENScan / proxy_pool sidecars (short timeout)",
+    )
     doctor.set_defaults(func=cmd_doctor)
+
+    smoke = sub.add_parser("smoke-sidecars", help="Probe ENScan and proxy_pool reachability")
+    smoke.add_argument("--timeout", type=float, default=2.0)
+    smoke.set_defaults(func=cmd_smoke_sidecars)
 
     personas = sub.add_parser("personas", help="List persona ids")
     personas.set_defaults(func=cmd_personas)

@@ -8,6 +8,20 @@ from typing import Any
 
 from enterprise_scout_mcp.models import CollectResult
 
+ENTITY_COLUMNS = (
+    "entity_id",
+    "name",
+    "former_name",
+    "platform",
+    "source_channel",
+    "query_keyword",
+    "grade",
+    "persona_id",
+    "collected_at",
+    "payload_json",
+    "message",
+)
+
 
 def entity_row(result: CollectResult) -> dict[str, Any]:
     """Normalize collect result to EnterpriseLake entities/part.parquet columns."""

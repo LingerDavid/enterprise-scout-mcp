@@ -9,4 +9,5 @@ dist/
 *.egg-info/
 config.yaml
 secrets/
+nodriver_data/
 G:/

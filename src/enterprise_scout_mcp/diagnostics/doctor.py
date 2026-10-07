@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from enterprise_scout_mcp.config import AppConfig, resolve_project_root
+from enterprise_scout_mcp.diagnostics.sidecars import build_sidecar_report
 from enterprise_scout_mcp.models import ChannelKind
 from enterprise_scout_mcp.scheduler import CollectorScheduler
 
@@ -14,7 +15,12 @@ def _resolve(root: Path, rel: str) -> Path:
     return p if p.is_absolute() else root / p
 
 
-def build_doctor_report(scheduler: CollectorScheduler, config: AppConfig) -> dict:
+def build_doctor_report(
+    scheduler: CollectorScheduler,
+    config: AppConfig,
+    *,
+    probe_sidecars: bool = False,
+) -> dict:
     root = resolve_project_root()
     pw = config.integrations.playwright
     wh = Path(config.output.warehouse_dir)
@@ -58,3 +64,6 @@ def build_doctor_report(scheduler: CollectorScheduler, config: AppConfig) -> dic
         },
         "personas": scheduler._persona.list_ids(),
     }
+    if probe_sidecars:
+        report["sidecars"] = build_sidecar_report(config)
+    return report

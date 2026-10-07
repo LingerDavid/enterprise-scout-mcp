@@ -65,6 +65,8 @@ escout personas
 escout collect 小米 -p aiqicha
 escout sync-cookies --from-file ./secrets/aiqicha_cookies.txt
 escout register-hermes          # 写入 ~/.hermes/config.yaml
+escout doctor --probe           # 含 ENScan / proxy_pool 探活
+escout smoke-sidecars           # 仅 sidecar 探活（CI/脚本用）
 ```
 
 DB 未命中时，`playwright.fetch_on_miss` 会调用 `scripts/aiqicha_fetch_one.py`（httpx + cookie）抓取并 upsert 到 `companies.db`。若 httpx 返回验证码，且 `nodriver_on_captcha: true`，自动回退到 `scripts/aiqicha_fetch_nodriver.py`。
@@ -78,6 +80,8 @@ DB 未命中时，`playwright.fetch_on_miss` 会调用 `scripts/aiqicha_fetch_on
 | `warehouse/entities/part.parquet` | 企业实体行 |
 | `warehouse/edges/equity/part.parquet` | 股权/投资/分支边（来自 ENScan invest/stockholder/branch） |
 | `raw/` / `raw/retry_queue/` | partial / captcha 分级 JSON |
+
+列定义见 [docs/warehouse-schema.md](docs/warehouse-schema.md)（与 EnterpriseLake layout 对齐）。
 
 ## 架构
 

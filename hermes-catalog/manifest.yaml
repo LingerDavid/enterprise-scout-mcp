@@ -1,28 +1,35 @@
 # Proposed Hermes optional-mcp catalog entry (PR to hermes-agent/optional-mcps/).
+# Replace `source` / `install.url` / `ref` with your published git repo + pinned SHA
+# before upstream merge. Local dev: `escout register-hermes`.
 manifest_version: 1
 
 name: enterprise-scout-mcp
 description: Orchestrated enterprise registry intelligence (ENScan, aiqicha, Handaas).
-source: file:///E:/Project/enterprise-scout-mcp
+source: https://github.com/YOUR_ORG/enterprise-scout-mcp
 
 transport:
   type: stdio
-  command: "${INSTALL_DIR}/.venv/Scripts/enterprise-scout-mcp.exe"
-  args: []
+  command: "${INSTALL_DIR}/.venv/bin/python"
+  args:
+    - "-m"
+    - "enterprise_scout_mcp.mcp.server"
 
 install:
-  type: local
-  path: "${INSTALL_DIR}"
+  type: git
+  url: https://github.com/YOUR_ORG/enterprise-scout-mcp.git
+  ref: REPLACE_WITH_40_CHAR_COMMIT_SHA
   bootstrap:
-    - "python -m venv .venv"
-    - ".venv/Scripts/pip install -e ."
+    - "python3 -m venv .venv"
+    - ".venv/bin/pip install -e '.[warehouse]'"
 
 auth:
   type: none
 
 post_install: |
-  Copy config.example.yaml to config.yaml and set ENScan / cookie paths.
+  Copy config.example.yaml to config.yaml beside the install dir.
+  Point integrations.ensan_go at ENScan_GO :31000 and playwright paths at aiqicha_scraper.
   Run `escout sync-cookies` after exporting aiqicha cookies.
+  Optional browser fallback: `.venv/bin/pip install -e '.[browser]'`.
   Start a new Hermes session to load enterprise_collect / scout_doctor tools.
 
 suggest:
