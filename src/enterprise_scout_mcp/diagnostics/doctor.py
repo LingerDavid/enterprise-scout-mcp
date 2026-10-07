@@ -27,8 +27,11 @@ def build_doctor_report(
     entities = wh / "entities" / "part.parquet"
     edges = wh / "edges" / "equity" / "part.parquet"
 
-    return {
+    report: dict = {
         "project_root": str(root),
+        "routing": {
+            "ensan_only": config.routing.ensan_only,
+        },
         "ensan_go": {
             "available": scheduler._channels[ChannelKind.ENSCAN_GO].available(),
             "base_url": config.integrations.ensan_go.base_url,
@@ -40,6 +43,7 @@ def build_doctor_report(
             "companies_db": str(_resolve(root, pw.companies_db)),
             "db_exists": _resolve(root, pw.companies_db).is_file(),
             "fetch_on_miss": pw.fetch_on_miss,
+            "note": "disabled under ensan_only; kept for force_channel only",
         },
         "nodriver": {
             "on_captcha": pw.nodriver_on_captcha,
@@ -53,6 +57,7 @@ def build_doctor_report(
         "proxy_pool": {
             "enabled": config.integrations.proxy_pool.enabled,
             "base_url": config.integrations.proxy_pool.base_url,
+            "note": "unused under ensan_only (ENScan owns egress)",
         },
         "warehouse": {
             "dir": str(wh),

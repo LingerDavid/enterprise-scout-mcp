@@ -23,6 +23,7 @@ RATIO_KEYS = ("持股比例", "投资比例", "ratio", "比例", "占股比例",
 
 SECTION_RELATION = {
     "invest": "invest",
+    "holds": "invest",  # ENScan 控股企业 → outbound invest/HOLDS
     "partner": "holder",
     "stockholder": "holder",
     "holder": "holder",

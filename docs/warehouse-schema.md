@@ -10,8 +10,8 @@ One row per successful or partial collect (`grade` in `ok`, `partial`).
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `entity_id` | string | Platform id (`aiqicha_id`, `nameId`, …) |
-| `name` | string | Canonical company name |
+| `entity_id` | string | Platform id (`pid` / `aiqicha_id` / `nameId`, …) |
+| `name` | string | Canonical company name（ENScan 从 `enterprise_info[0].name` 解包） |
 | `former_name` | string | Former / alias name |
 | `platform` | string | `aiqicha`, `tianyancha`, `handaas`, … |
 | `source_channel` | string | `enscan_go`, `playwright`, `handaas_api` |
@@ -24,7 +24,7 @@ One row per successful or partial collect (`grade` in `ok`, `partial`).
 
 ## edges/equity/part.parquet
 
-Extracted from ENScan-style nested sections: `partner` / `stockholder` / `holder` (股东), `invest`, `branch`. ENScan 爱企查股东字段为 `partner`，比例字段为 `scale`。
+Extracted from ENScan-style nested sections: `partner` / `stockholder` / `holder` (股东→`holder`), `invest` / `holds` (投资/控股→`invest`), `branch`. ENScan 统一导出键为 `name` + `scale`（见 ENSMapLN）。
 
 | Column | Type | Description |
 |--------|------|-------------|

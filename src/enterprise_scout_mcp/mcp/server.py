@@ -4,17 +4,24 @@ from __future__ import annotations
 
 import json
 import sys
-
 from pathlib import Path
 
 from enterprise_scout_mcp.batch import parse_keywords, run_batch
 from enterprise_scout_mcp.config import load_config
+from enterprise_scout_mcp.defaults import DEFAULT_REGISTRY_FIELDS
 from enterprise_scout_mcp.diagnostics.doctor import build_doctor_report
 from enterprise_scout_mcp.diagnostics.sidecars import build_sidecar_report
-from enterprise_scout_mcp.warehouse.neo4j_loader import import_warehouse
 from enterprise_scout_mcp.integrations.enscan_cookies import sync_aiqicha_to_enscan
 from enterprise_scout_mcp.models import CollectTask, Platform
 from enterprise_scout_mcp.scheduler import CollectorScheduler
+from enterprise_scout_mcp.warehouse.neo4j_loader import import_warehouse
+
+
+def _parse_fields(fields: str) -> tuple[str, ...]:
+    if not fields or not fields.strip():
+        return DEFAULT_REGISTRY_FIELDS
+    parts = tuple(p.strip() for p in fields.split(",") if p.strip())
+    return parts or DEFAULT_REGISTRY_FIELDS
 
 
 def create_mcp_server():
@@ -23,25 +30,38 @@ def create_mcp_server():
     mcp = FastMCP(
         "enterprise-scout-mcp",
         instructions=(
-            "Orchestrated enterprise registry intelligence. "
-            "Routes across ENScan_GO (batch), Playwright (interactive), and Handaas API. "
-            "Persona-aware with quota, cooldown, and consistency checks."
+            "Enterprise registry intelligence via ENScan_GO (ensan_only). "
+            "Optional Handaas API for paid complement. "
+            "Writes entities/edges to EnterpriseLake. "
+            "Default fields include partner/holds/invest/branch for equity edges."
         ),
     )
 
     @mcp.tool()
-    def enterprise_collect(keyword: str, platform: str = "aiqicha", depth: int = 1) -> str:
-        """Collect enterprise info for a company keyword via the orchestrator."""
+    def enterprise_collect(
+        keyword: str,
+        platform: str = "aiqicha",
+        depth: int = 1,
+        fields: str = "",
+        persona_id: str = "",
+    ) -> str:
+        """Collect enterprise info (default fields: enterprise_info,partner,holds,invest,branch)."""
         config = load_config()
         scheduler = CollectorScheduler(config)
         try:
-            task = CollectTask(keyword=keyword, platform=Platform(platform), depth=depth)
-            result = scheduler.run(task)
+            task = CollectTask(
+                keyword=keyword,
+                platform=Platform(platform),
+                depth=depth,
+                fields=_parse_fields(fields),
+            )
+            result = scheduler.run(task, persona_id=persona_id or None)
             return json.dumps(
                 {
                     "grade": result.grade.value,
                     "channel": result.channel.value,
                     "message": result.message,
+                    "persona_id": result.persona_id,
                     "data": result.data,
                 },
                 ensure_ascii=False,
@@ -54,6 +74,8 @@ def create_mcp_server():
         keywords: str,
         platform: str = "aiqicha",
         depth: int = 1,
+        fields: str = "",
+        persona_id: str = "",
         stop_on_blocked: bool = False,
         checkpoint_path: str = "",
     ) -> str:
@@ -66,6 +88,8 @@ def create_mcp_server():
                 parse_keywords(keywords),
                 platform=Platform(platform),
                 depth=depth,
+                fields=_parse_fields(fields),
+                persona_id=persona_id or None,
                 stop_on_blocked=stop_on_blocked,
                 checkpoint_path=checkpoint_path or None,
             )
@@ -74,9 +98,11 @@ def create_mcp_server():
             scheduler.close()
 
     @mcp.tool()
-    def enterprise_search(keyword: str, platform: str = "aiqicha") -> str:
-        """Lightweight search - same as collect with depth=0 fields default."""
-        return enterprise_collect(keyword=keyword, platform=platform, depth=0)
+    def enterprise_search(keyword: str, platform: str = "aiqicha", fields: str = "") -> str:
+        """Lightweight search — collect with depth=0 (same default equity fields)."""
+        return enterprise_collect(
+            keyword=keyword, platform=platform, depth=0, fields=fields
+        )
 
     @mcp.tool()
     def sync_enscan_cookies(cookie_file: str = "") -> str:
@@ -89,7 +115,7 @@ def create_mcp_server():
 
     @mcp.tool()
     def scout_doctor(probe_sidecars: bool = False) -> str:
-        """Report availability of ENScan_GO, Playwright, Handaas, and loaded personas."""
+        """Report availability of ENScan_GO, Handaas, personas; optional live sidecar probe."""
         config = load_config()
         scheduler = CollectorScheduler(config)
         try:
@@ -129,7 +155,6 @@ def create_mcp_server():
         )
 
     return mcp
-
 
 
 def main() -> None:

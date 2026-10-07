@@ -4,16 +4,17 @@
 
 企业工商/穿透情报 **MCP 服务**。Python 编排层（人设、风控路由、行为配额）+ 多通道采集，输出到 [EnterpriseLake](../EnterpriseLake) `G:/enterprise_lake/`。
 
-与 `enterprise-mcp-server`（Handaas 单源 API）互补：本服务编排 ENScan_GO / Playwright / 本地通道。
+与 `enterprise-mcp-server`（Handaas 单源 API）互补：工商主路径只走 ENScan_GO；Handaas 为可选付费补源。
 
 ## MCP 工具
 
 | 工具 | 说明 |
 |------|------|
-| `enterprise_collect` | 按关键词采集（平台、深度可配） |
+| `enterprise_collect` | 按关键词采集（平台 / 深度 / fields / persona） |
 | `enterprise_search` | 轻量搜索（depth=0） |
-| `enterprise_collect_batch` | 批量采集（逗号/换行分隔关键词） |
-| `scout_doctor` | 检查 ENScan / Playwright / Handaas / 人设 |
+| `enterprise_collect_batch` | 批量采集（支持 checkpoint） |
+| `sync_enscan_cookies` | 把本地 cookie 写入 ENScan config |
+| `scout_doctor` | 检查 ENScan / Handaas / 人设（可 probe sidecar） |
 | `scout_sidecars` | 探活 ENScan / proxy_pool |
 | `scout_import_neo4j` | warehouse parquet → Neo4j（默认 dry_run） |
 
@@ -80,7 +81,9 @@ escout smoke-collect 小米       # 实机采集冒烟（需 ENScan 运行）
 
 **采集策略：只走 ENScan。** `routing.ensan_only: true`（默认）时，爱企查 / 天眼查 / 快查 / 风鸟一律经 ENScan_GO `:31000`，不做 Playwright/httpx/nodriver 页面直采回退。ENScan 不可用时直接报错。天眼查：`escout collect 关键词 -p tianyancha`（需在 ENScan `config.yaml` 配置 TYC cookie）。
 
-`state_persist: true` 时，日配额与路由成功率写入 `state_dir`（默认 `./.state/`）。`collect-batch --checkpoint` 支持断点续跑。
+默认 `fields`：`enterprise_info,partner,holds,invest,branch`（写入实体 + 股权边）。可用 `-f` / MCP `fields` 覆盖。
+
+`state_persist: true` 时，日配额与路由成功率写入 `state_dir`（默认 `./.state/`）。`collect-batch --checkpoint` 断点续跑：仅 `ok`/`partial` 记为 done，`error`/`captcha`/`blocked` 下次会重试。
 
 ## Warehouse 输出
 
@@ -89,7 +92,7 @@ escout smoke-collect 小米       # 实机采集冒烟（需 ENScan 运行）
 | 路径 | 内容 |
 |------|------|
 | `warehouse/entities/part.parquet` | 企业实体行 |
-| `warehouse/edges/equity/part.parquet` | 股权/投资/分支边（来自 ENScan invest/stockholder/branch） |
+| `warehouse/edges/equity/part.parquet` | 股权/投资/分支边（partner/holds/invest/branch） |
 | `raw/` / `raw/retry_queue/` | partial / captcha 分级 JSON |
 
 列定义见 [docs/warehouse-schema.md](docs/warehouse-schema.md)（与 EnterpriseLake layout 对齐）。

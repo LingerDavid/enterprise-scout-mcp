@@ -22,18 +22,51 @@ ENTITY_COLUMNS = (
     "message",
 )
 
+# ENScan ENSMapLN + legacy / Playwright keys.
+_NAME_KEYS = (
+    "company_name",
+    "name",
+    "entName",
+    "企业名称",
+)
+_ID_KEYS = (
+    "aiqicha_id",
+    "entity_id",
+    "nameId",
+    "pid",
+    "PID",
+)
+_FORMER_KEYS = ("former_name", "曾用名")
+
+
+def _first_info(data: dict[str, Any]) -> dict[str, Any]:
+    """Flatten ENScan nested enterprise_info[0] into a lookup dict."""
+    info = data.get("enterprise_info")
+    if isinstance(info, list) and info and isinstance(info[0], dict):
+        return info[0]
+    if isinstance(info, dict):
+        return info
+    return {}
+
+
+def _pick(sources: list[dict[str, Any]], keys: tuple[str, ...]) -> str:
+    for src in sources:
+        for k in keys:
+            if k in src and src[k]:
+                return str(src[k]).strip()
+    return ""
+
 
 def entity_row(result: CollectResult) -> dict[str, Any]:
     """Normalize collect result to EnterpriseLake entities/part.parquet columns."""
     data = result.data or {}
-    name = str(data.get("company_name") or data.get("name") or result.task.keyword)
-    former = str(data.get("former_name") or "")
-    entity_id = str(
-        data.get("aiqicha_id")
-        or data.get("entity_id")
-        or data.get("nameId")
-        or ""
-    )
+    nested = _first_info(data) if isinstance(data, dict) else {}
+    sources = [data, nested] if isinstance(data, dict) else [nested]
+
+    name = _pick(sources, _NAME_KEYS) or result.task.keyword
+    former = _pick(sources, _FORMER_KEYS)
+    entity_id = _pick(sources, _ID_KEYS)
+
     return {
         "entity_id": entity_id,
         "name": name,
@@ -45,4 +78,5 @@ def entity_row(result: CollectResult) -> dict[str, Any]:
         "persona_id": result.persona_id,
         "collected_at": datetime.now(timezone.utc).isoformat(),
         "payload_json": json.dumps(data, ensure_ascii=False),
+        "message": result.message or "",
     }

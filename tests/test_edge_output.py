@@ -34,6 +34,24 @@ def test_extract_edges_enscan_partner() -> None:
     assert edges[0]["ratio"] == "25.29572%"
 
 
+def test_extract_edges_holds() -> None:
+    task = CollectTask(keyword="RootCo", platform=Platform.AIQICHA)
+    result = CollectResult(
+        task=task,
+        channel=ChannelKind.ENSCAN_GO,
+        grade=ResultGrade.OK,
+        data={"holds": [{"name": "SubHoldCo", "scale": "80%"}]},
+        persona_id="p1",
+    )
+    edges = extract_edges(result)
+    assert len(edges) == 1
+    assert edges[0]["relation"] == "invest"
+    assert edges[0]["src_name"] == "RootCo"
+    assert edges[0]["dst_name"] == "SubHoldCo"
+    assert edges[0]["section"] == "holds"
+    assert edges[0]["ratio"] == "80%"
+
+
 def test_extract_edges_invest_and_holder() -> None:
     task = CollectTask(keyword="Acme Corp", platform=Platform.AIQICHA)
     result = CollectResult(

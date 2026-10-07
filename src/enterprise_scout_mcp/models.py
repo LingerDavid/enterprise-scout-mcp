@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from enterprise_scout_mcp.defaults import DEFAULT_REGISTRY_FIELDS
+
 
 class Platform(str, Enum):
     AIQICHA = "aiqicha"
@@ -33,7 +35,7 @@ class ResultGrade(str, Enum):
 class CollectTask:
     keyword: str
     platform: Platform
-    fields: tuple[str, ...] = ("enterprise_info",)
+    fields: tuple[str, ...] = DEFAULT_REGISTRY_FIELDS
     depth: int = 1
     force_channel: ChannelKind | None = None
 

@@ -4,7 +4,7 @@
 manifest_version: 1
 
 name: enterprise-scout-mcp
-description: Orchestrated enterprise registry intelligence (ENScan, aiqicha, Handaas).
+description: ENScan-only enterprise registry intel + EnterpriseLake edges.
 source: https://github.com/LingerDavid/enterprise-scout-mcp
 
 transport:
@@ -27,9 +27,8 @@ auth:
 
 post_install: |
   Copy config.example.yaml to config.yaml beside the install dir.
-  Point integrations.ensan_go at ENScan_GO :31000 and playwright paths at aiqicha_scraper.
-  Run `escout sync-cookies` after exporting aiqicha cookies.
-  Optional browser fallback: `.venv/bin/pip install -e '.[browser]'`.
+  Point integrations.ensan_go at ENScan_GO :31000 (required; ensan_only).
+  Run `escout sync-cookies` after exporting aiqicha cookies into ENScan config.
   Start a new Hermes session to load enterprise_collect / scout_doctor tools.
 
 suggest:

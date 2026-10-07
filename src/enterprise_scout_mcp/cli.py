@@ -30,7 +30,13 @@ def cmd_collect(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     scheduler = CollectorScheduler(config)
     try:
-        fields = tuple(args.fields.split(",")) if args.fields else ("enterprise_info",)
+        from enterprise_scout_mcp.defaults import DEFAULT_REGISTRY_FIELDS
+
+        fields = (
+            tuple(f.strip() for f in args.fields.split(",") if f.strip())
+            if args.fields
+            else DEFAULT_REGISTRY_FIELDS
+        )
         task = CollectTask(
             keyword=args.keyword,
             platform=_platform(args.platform),
@@ -115,7 +121,13 @@ def cmd_collect_batch(args: argparse.Namespace) -> int:
         else:
             print("provide --file or positional keywords", file=sys.stderr)
             return 2
-        fields = tuple(args.fields.split(",")) if args.fields else ("enterprise_info",)
+        from enterprise_scout_mcp.defaults import DEFAULT_REGISTRY_FIELDS
+
+        fields = (
+            tuple(f.strip() for f in args.fields.split(",") if f.strip())
+            if args.fields
+            else DEFAULT_REGISTRY_FIELDS
+        )
         summary = run_batch(
             scheduler,
             keywords,

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
+from enterprise_scout_mcp.defaults import DEFAULT_REGISTRY_FIELDS, DONE_GRADES
 from enterprise_scout_mcp.models import CollectResult, CollectTask, Platform
 from enterprise_scout_mcp.scheduler import CollectorScheduler
 
@@ -55,7 +57,9 @@ def _load_checkpoint(path: Path) -> dict:
 
 def _save_checkpoint(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def run_batch(
@@ -64,7 +68,7 @@ def run_batch(
     *,
     platform: Platform,
     depth: int = 1,
-    fields: tuple[str, ...] = ("enterprise_info",),
+    fields: tuple[str, ...] = DEFAULT_REGISTRY_FIELDS,
     persona_id: str | None = None,
     stop_on_blocked: bool = False,
     checkpoint_path: Path | str | None = None,
@@ -72,7 +76,6 @@ def run_batch(
     summary = BatchSummary()
     kws = list(keywords)
     done: set[str] = set()
-    ckpt: dict | None = None
     ckpt_file: Path | None = None
 
     if checkpoint_path is not None:
@@ -93,8 +96,11 @@ def run_batch(
         grade = result.grade.value
         summary.counts[grade] = summary.counts.get(grade, 0) + 1
         item = _result_item(result)
+        # Drop prior failed attempt for same keyword so results stay one-per-kw.
+        summary.results = [r for r in summary.results if r.get("keyword") != keyword]
         summary.results.append(item)
-        done.add(keyword)
+        if grade in DONE_GRADES:
+            done.add(keyword)
         if ckpt_file is not None:
             _save_checkpoint(
                 ckpt_file,
@@ -104,6 +110,8 @@ def run_batch(
                     "results": summary.results,
                     "platform": platform.value,
                     "depth": depth,
+                    "fields": list(fields),
+                    "persona_id": persona_id or "",
                 },
             )
         if stop_on_blocked and grade in ("blocked", "captcha"):
@@ -112,11 +120,14 @@ def run_batch(
 
 
 def _result_item(result: CollectResult) -> dict:
-    data = result.data or {}
+    from enterprise_scout_mcp.output.entity_schema import entity_row
+
+    row = entity_row(result)
     return {
         "keyword": result.task.keyword,
         "grade": result.grade.value,
         "channel": result.channel.value,
         "message": result.message,
-        "entity_id": str(data.get("aiqicha_id") or data.get("entity_id") or data.get("nameId") or ""),
+        "entity_id": row["entity_id"],
+        "name": row["name"],
     }

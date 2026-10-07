@@ -16,7 +16,22 @@ def test_doctor_report_keys() -> None:
         scheduler.close()
 
     assert "ensan_go" in report
+    assert "routing" in report
+    assert report["routing"]["ensan_only"] is True
     assert "nodriver" in report
     assert "warehouse" in report
     assert "script_exists" in report["nodriver"]
     assert "entities_exists" in report["warehouse"]
+    assert "sidecars" not in report
+
+
+def test_doctor_probe_sidecars_attached() -> None:
+    config = AppConfig()
+    scheduler = CollectorScheduler(config)
+    try:
+        report = build_doctor_report(scheduler, config, probe_sidecars=True)
+    finally:
+        scheduler.close()
+
+    assert "sidecars" in report
+    assert "ensan_go" in report["sidecars"]
