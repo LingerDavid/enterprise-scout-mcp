@@ -49,3 +49,16 @@ Extracted from ENScan-style nested sections: `invest`, `stockholder` / `holder`,
 | `blocked` | `raw/dead_letter/` |
 
 Files: `{platform}_{keyword}_{timestamp}.json`
+
+## Neo4j import
+
+After `docker compose up -d` in EnterpriseLake:
+
+```powershell
+pip install -e ".[graph]"
+escout import-neo4j --dry-run
+escout import-neo4j --uri bolt://127.0.0.1:7687 --user neo4j --password enterprise-lake-dev
+```
+
+Graph model: `(:Company {id})-[:HOLDS {percent}]->(:Company)` plus optional `[:BRANCH]`.
+Penetration queries: `EnterpriseLake/cypher/equity_penetration.cypher`.

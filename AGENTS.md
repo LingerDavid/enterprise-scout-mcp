@@ -14,7 +14,7 @@ MCP-first enterprise registry intelligence orchestrator.
 |---------|---------|
 | `enterprise-scout-mcp` | MCP server (stdio, default) |
 | `enterprise-scout-mcp streamable-http` | MCP over HTTP |
-| `escout` | Dev CLI (doctor / collect / personas) |
+| `escout` | Dev CLI (doctor / collect / collect-batch / import-neo4j) |
 
 ## Verify
 

@@ -31,8 +31,9 @@ class CollectorScheduler:
         self._behavior = BehaviorOrchestrator(config.behavior)
         self._consistency = EnvironmentValidator()
         self._output = OutputRouter(config.output)
+        self._proxy = self._build_proxy_client()
         self._captcha = CaptchaHandler(
-            proxy_client=self._proxy_client(),
+            proxy_client=self._proxy,
             default_strategy=CaptchaStrategy.ROTATE_IP,
         )
 
@@ -50,16 +51,19 @@ class CollectorScheduler:
             else None
         )
 
-    def _proxy_client(self) -> ProxyPoolClient | None:
+    def _build_proxy_client(self) -> ProxyPoolClient | None:
         pp = self._config.integrations.proxy_pool
         if not pp.enabled:
             return None
         return ProxyPoolClient(pp.base_url)
 
     def close(self) -> None:
-        ensan = self._channels.get(ChannelKind.ENSCAN_GO)
-        if isinstance(ensan, EnsanGoChannel):
-            ensan.close()
+        for channel in self._channels.values():
+            close = getattr(channel, "close", None)
+            if callable(close):
+                close()
+        if self._proxy is not None:
+            self._proxy.close()
 
     def run(self, task: CollectTask, *, persona_id: str | None = None) -> CollectResult:
         pid = persona_id or self._config.personas.default
@@ -84,9 +88,8 @@ class CollectorScheduler:
         channel = self._channels[channel_kind]
 
         proxy_url: str | None = None
-        proxy_client = self._proxy_client()
-        if proxy_client:
-            endpoint = proxy_client.get(https=True)
+        if self._proxy:
+            endpoint = self._proxy.get(https=True)
             if endpoint:
                 proxy_url = endpoint.url
 

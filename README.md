@@ -10,6 +10,7 @@
 |------|------|
 | `enterprise_collect` | 按关键词采集（平台、深度可配） |
 | `enterprise_search` | 轻量搜索（depth=0） |
+| `enterprise_collect_batch` | 批量采集（逗号/换行分隔关键词） |
 | `scout_doctor` | 检查 ENScan / Playwright / Handaas / 人设 |
 
 ## 快速启动
@@ -63,6 +64,9 @@ enterprise-scout-mcp streamable-http  # HTTP :8000
 escout doctor
 escout personas
 escout collect 小米 -p aiqicha
+escout collect-batch --file keywords.txt -p aiqicha
+escout import-neo4j --dry-run    # 统计 warehouse 行数
+escout import-neo4j              # 写入 Neo4j（需 pip install -e ".[graph]"）
 escout sync-cookies --from-file ./secrets/aiqicha_cookies.txt
 escout register-hermes          # 写入 ~/.hermes/config.yaml
 escout doctor --probe           # 含 ENScan / proxy_pool 探活

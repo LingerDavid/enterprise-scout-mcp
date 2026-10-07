@@ -7,6 +7,7 @@ import sys
 
 from pathlib import Path
 
+from enterprise_scout_mcp.batch import parse_keywords, run_batch
 from enterprise_scout_mcp.config import load_config
 from enterprise_scout_mcp.diagnostics.doctor import build_doctor_report
 from enterprise_scout_mcp.integrations.enscan_cookies import sync_aiqicha_to_enscan
@@ -43,6 +44,28 @@ def create_mcp_server():
                 },
                 ensure_ascii=False,
             )
+        finally:
+            scheduler.close()
+
+    @mcp.tool()
+    def enterprise_collect_batch(
+        keywords: str,
+        platform: str = "aiqicha",
+        depth: int = 1,
+        stop_on_blocked: bool = False,
+    ) -> str:
+        """Collect multiple company keywords (comma or newline separated)."""
+        config = load_config()
+        scheduler = CollectorScheduler(config)
+        try:
+            summary = run_batch(
+                scheduler,
+                parse_keywords(keywords),
+                platform=Platform(platform),
+                depth=depth,
+                stop_on_blocked=stop_on_blocked,
+            )
+            return json.dumps(summary.to_dict(), ensure_ascii=False)
         finally:
             scheduler.close()
 

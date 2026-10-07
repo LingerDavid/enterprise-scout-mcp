@@ -34,6 +34,9 @@ class HandaasChannel(CollectionChannel):
             and self._config.secret_key
         )
 
+    def close(self) -> None:
+        self._client.close()
+
     def _call(self, product_id: str, params: dict) -> dict | str:
         call_params = {
             "product_id": product_id,

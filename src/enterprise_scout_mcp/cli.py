@@ -8,6 +8,7 @@ import sys
 
 from pathlib import Path
 
+from enterprise_scout_mcp.batch import keywords_from_file, run_batch
 from enterprise_scout_mcp.config import load_config
 from enterprise_scout_mcp.diagnostics.doctor import build_doctor_report
 from enterprise_scout_mcp.diagnostics.sidecars import build_sidecar_report
@@ -101,6 +102,57 @@ def cmd_register_hermes(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_collect_batch(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    scheduler = CollectorScheduler(config)
+    try:
+        if args.file:
+            keywords = keywords_from_file(args.file)
+        elif args.keywords:
+            from enterprise_scout_mcp.batch import parse_keywords
+
+            keywords = parse_keywords(args.keywords)
+        else:
+            print("provide --file or positional keywords", file=sys.stderr)
+            return 2
+        fields = tuple(args.fields.split(",")) if args.fields else ("enterprise_info",)
+        summary = run_batch(
+            scheduler,
+            keywords,
+            platform=_platform(args.platform),
+            depth=args.depth,
+            fields=fields,
+            persona_id=args.persona,
+            stop_on_blocked=args.stop_on_blocked,
+        )
+        print(json.dumps(summary.to_dict(), ensure_ascii=False, indent=2))
+        failed = summary.counts.get("error", 0) + summary.counts.get("blocked", 0)
+        return 0 if failed == 0 else 1
+    finally:
+        scheduler.close()
+
+
+def cmd_import_neo4j(args: argparse.Namespace) -> int:
+    import subprocess
+
+    script = Path(__file__).resolve().parents[2] / "scripts" / "import_warehouse_neo4j.py"
+    cmd = [sys.executable, str(script)]
+    if args.config:
+        cmd.extend(["-c", args.config])
+    if args.warehouse_dir:
+        cmd.extend(["--warehouse-dir", args.warehouse_dir])
+    if args.uri:
+        cmd.extend(["--uri", args.uri])
+    if args.user:
+        cmd.extend(["--user", args.user])
+    if args.password:
+        cmd.extend(["--password", args.password])
+    if args.dry_run:
+        cmd.append("--dry-run")
+    proc = subprocess.run(cmd, check=False)
+    return proc.returncode
+
+
 def cmd_sync_cookies(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     cookie_src = Path(args.from_file or config.integrations.playwright.cookie_file)
@@ -122,6 +174,24 @@ def build_parser() -> argparse.ArgumentParser:
     collect.add_argument("--depth", type=int, default=1)
     collect.add_argument("--persona", default=None)
     collect.set_defaults(func=cmd_collect)
+
+    batch = sub.add_parser("collect-batch", help="Collect many keywords from text or file")
+    batch.add_argument("keywords", nargs="?", default="", help="Comma/newline separated keywords")
+    batch.add_argument("--file", default=None, help="Text file with one keyword per line")
+    batch.add_argument("-p", "--platform", default="aiqicha", type=str)
+    batch.add_argument("-f", "--fields", default="", help="Comma-separated ENScan fields")
+    batch.add_argument("--depth", type=int, default=1)
+    batch.add_argument("--persona", default=None)
+    batch.add_argument("--stop-on-blocked", action="store_true")
+    batch.set_defaults(func=cmd_collect_batch)
+
+    neo4j = sub.add_parser("import-neo4j", help="Import warehouse parquet into Neo4j")
+    neo4j.add_argument("--warehouse-dir", default=None)
+    neo4j.add_argument("--uri", default=None)
+    neo4j.add_argument("--user", default=None)
+    neo4j.add_argument("--password", default=None)
+    neo4j.add_argument("--dry-run", action="store_true")
+    neo4j.set_defaults(func=cmd_import_neo4j)
 
     doctor = sub.add_parser("doctor", help="Check integration availability")
     doctor.add_argument(
