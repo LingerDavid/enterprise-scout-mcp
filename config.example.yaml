@@ -48,6 +48,9 @@ integrations:
     cookie_file: "./secrets/aiqicha_cookies.txt"
     aiqicha_scraper_dir: "../aiqicha_scraper"
     companies_db: "../aiqicha_scraper/companies.db"
+    fetch_on_miss: true
+    fetch_script: "./scripts/aiqicha_fetch_one.py"
+    fetch_timeout_seconds: 90
 
   # curl_cffi disguise — Scrapling-style TLS impersonation
   curl_cffi:

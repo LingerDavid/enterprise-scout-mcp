@@ -76,6 +76,19 @@ def cmd_personas(_args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_register_hermes(args: argparse.Namespace) -> int:
+    import subprocess
+
+    script = Path(__file__).resolve().parents[2] / "scripts" / "register_hermes.py"
+    cmd = [sys.executable, str(script)]
+    if args.dry_run:
+        cmd.append("--dry-run")
+    if args.no_venv:
+        cmd.append("--no-venv")
+    subprocess.run(cmd, check=True)
+    return 0
+
+
 def cmd_sync_cookies(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     cookie_src = Path(args.from_file or config.integrations.playwright.cookie_file)
@@ -108,6 +121,11 @@ def build_parser() -> argparse.ArgumentParser:
     sync.add_argument("--from-file", default=None, help="Cookie file (default: playwright.cookie_file)")
     sync.add_argument("--enscan-config", default=None, help="ENScan config path")
     sync.set_defaults(func=cmd_sync_cookies)
+
+    reg = sub.add_parser("register-hermes", help="Add enterprise-scout-mcp to ~/.hermes/config.yaml")
+    reg.add_argument("--dry-run", action="store_true")
+    reg.add_argument("--no-venv", action="store_true")
+    reg.set_defaults(func=cmd_register_hermes)
 
     return p
 

@@ -62,7 +62,11 @@ enterprise-scout-mcp streamable-http  # HTTP :8000
 escout doctor
 escout personas
 escout collect 小米 -p aiqicha
+escout sync-cookies --from-file ./secrets/aiqicha_cookies.txt
+escout register-hermes          # 写入 ~/.hermes/config.yaml
 ```
+
+DB 未命中时，`playwright.fetch_on_miss` 会调用 `scripts/aiqicha_fetch_one.py`（httpx + cookie）抓取并 upsert 到 `companies.db`。
 
 ## 架构
 

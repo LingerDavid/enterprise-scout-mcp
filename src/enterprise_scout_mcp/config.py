@@ -35,6 +35,9 @@ class PlaywrightConfig(BaseModel):
     cookie_file: str = "./secrets/aiqicha_cookies.txt"
     aiqicha_scraper_dir: str = "../aiqicha_scraper"
     companies_db: str = "../aiqicha_scraper/companies.db"
+    fetch_on_miss: bool = True
+    fetch_script: str = "./scripts/aiqicha_fetch_one.py"
+    fetch_timeout_seconds: float = 90.0
 
 
 class CurlCffiConfig(BaseModel):
