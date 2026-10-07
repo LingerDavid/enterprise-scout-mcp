@@ -1,0 +1,65 @@
+# Copy to config.yaml and adjust paths to sibling projects on your machine.
+
+data_root: "G:/enterprise_lake"
+
+personas:
+  dir: "./personas"
+  default: "desktop_chrome_cn"
+
+behavior:
+  global_daily_quota: 5000
+  persona_daily_quota: 200
+  min_delay_seconds: 2.0
+  max_delay_seconds: 8.0
+  cooldown_after_captcha_seconds: 600
+  cooldown_after_block_seconds: 1800
+
+routing:
+  # Platform success-rate window (in-memory; persist later)
+  min_success_rate_for_enscan: 0.6
+  prefer_enscan_for: ["icp", "app", "wechat", "invest", "branch"]
+  force_playwright_for: ["js_challenge", "login_required", "captcha"]
+
+integrations:
+  # ENScan_GO — sibling checkout: e:/Project/ENScan_GO
+  ensan_go:
+    enabled: true
+    base_url: "http://127.0.0.1:31000"
+    default_type: "aqc"  # aqc | tyc | kc | rb
+    timeout_seconds: 120
+    config_path: "../ENScan_GO/config.yaml"
+
+  # proxy_pool — sibling checkout: e:/Project/proxy_pool (docker compose)
+  proxy_pool:
+    enabled: false
+    base_url: "http://127.0.0.1:5010"
+
+  # Handaas MCP-style API — sibling: e:/Project/enterprise-mcp-server
+  handaas:
+    enabled: false
+    integrator_id: ""
+    secret_id: ""
+    secret_key: ""
+
+  # Playwright / nodriver channel — patterns from aiqicha_scraper
+  playwright:
+    enabled: true
+    headless: true
+    cookie_file: "./secrets/aiqicha_cookies.txt"
+    aiqicha_scraper_dir: "../aiqicha_scraper"
+    companies_db: "../aiqicha_scraper/companies.db"
+
+  # curl_cffi disguise — Scrapling-style TLS impersonation
+  curl_cffi:
+    enabled: true
+    impersonate: "chrome131"
+
+output:
+  warehouse_dir: "G:/enterprise_lake/warehouse"
+  raw_dir: "G:/enterprise_lake/raw"
+  parquet_enabled: true
+  grade_routes:
+    ok: "warehouse"
+    partial: "raw"
+    captcha: "retry_queue"
+    blocked: "dead_letter"

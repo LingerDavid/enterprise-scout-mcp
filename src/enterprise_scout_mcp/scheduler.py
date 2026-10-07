@@ -1,0 +1,126 @@
+"""Core orchestrator 鈥?persona 鈫?route 鈫?behavior 鈫?consistency 鈫?channel 鈫?output."""
+
+from __future__ import annotations
+
+from enterprise_scout_mcp.behavior.orchestrator import BehaviorOrchestrator
+from enterprise_scout_mcp.captcha.handler import CaptchaHandler, CaptchaStrategy
+from enterprise_scout_mcp.channels.base import CollectionChannel
+from enterprise_scout_mcp.channels.ensan_go import EnsanGoChannel
+from enterprise_scout_mcp.channels.handaas_api import HandaasChannel
+from enterprise_scout_mcp.channels.playwright_aiqicha import PlaywrightAiqichaChannel
+from enterprise_scout_mcp.config import AppConfig
+from enterprise_scout_mcp.consistency.validator import EnvironmentValidator
+from enterprise_scout_mcp.models import (
+    ChannelKind,
+    CollectResult,
+    CollectTask,
+    ResultGrade,
+)
+from enterprise_scout_mcp.output.router import OutputRouter
+from enterprise_scout_mcp.persona.engine import PersonaEngine
+from enterprise_scout_mcp.routing.risk_router import RiskAwareRouter
+from enterprise_scout_mcp.transport.curl_cffi_backend import CurlCffiTransport
+from enterprise_scout_mcp.transport.proxy_pool import ProxyPoolClient
+
+
+class CollectorScheduler:
+    def __init__(self, config: AppConfig) -> None:
+        self._config = config
+        self._persona = PersonaEngine(config.personas.dir)
+        self._router = RiskAwareRouter(config.routing)
+        self._behavior = BehaviorOrchestrator(config.behavior)
+        self._consistency = EnvironmentValidator()
+        self._output = OutputRouter(config.output)
+        self._captcha = CaptchaHandler(
+            proxy_client=self._proxy_client(),
+            default_strategy=CaptchaStrategy.ROTATE_IP,
+        )
+
+        self._channels: dict[ChannelKind, CollectionChannel] = {
+            ChannelKind.ENSCAN_GO: EnsanGoChannel(config.integrations.ensan_go),
+            ChannelKind.PLAYWRIGHT: PlaywrightAiqichaChannel(config.integrations.playwright),
+            ChannelKind.HANDAAS_API: HandaasChannel(config.integrations.handaas),
+        }
+        self._transport = (
+            CurlCffiTransport(config.integrations.curl_cffi.impersonate)
+            if config.integrations.curl_cffi.enabled
+            else None
+        )
+
+    def _proxy_client(self) -> ProxyPoolClient | None:
+        pp = self._config.integrations.proxy_pool
+        if not pp.enabled:
+            return None
+        return ProxyPoolClient(pp.base_url)
+
+    def close(self) -> None:
+        ensan = self._channels.get(ChannelKind.ENSCAN_GO)
+        if isinstance(ensan, EnsanGoChannel):
+            ensan.close()
+
+    def run(self, task: CollectTask, *, persona_id: str | None = None) -> CollectResult:
+        pid = persona_id or self._config.personas.default
+        persona = self._persona.load(pid)
+
+        allowed, reason = self._behavior.can_proceed(pid)
+        if not allowed:
+            return CollectResult(
+                task=task,
+                channel=ChannelKind.ENSCAN_GO,
+                grade=ResultGrade.BLOCKED,
+                message=reason,
+                persona_id=pid,
+            )
+
+        channel_kind = self._router.select_channel(
+            task,
+            ensan_available=self._channels[ChannelKind.ENSCAN_GO].available(),
+            playwright_available=self._channels[ChannelKind.PLAYWRIGHT].available(),
+            handaas_available=self._channels[ChannelKind.HANDAAS_API].available(),
+        )
+        channel = self._channels[channel_kind]
+
+        proxy_url: str | None = None
+        proxy_client = self._proxy_client()
+        if proxy_client:
+            endpoint = proxy_client.get(https=True)
+            if endpoint:
+                proxy_url = endpoint.url
+
+        headers: dict[str, str] = {}
+        if self._transport:
+            headers = self._transport.build_headers(persona)
+
+        report = self._consistency.validate(
+            persona,
+            outbound_headers=headers,
+            proxy_country=persona.network.get("country"),
+            tls_profile=self._config.integrations.curl_cffi.impersonate,
+        )
+        if not report.ok:
+            return CollectResult(
+                task=task,
+                channel=channel_kind,
+                grade=ResultGrade.ERROR,
+                message="; ".join(report.violations),
+                persona_id=pid,
+            )
+
+        self._behavior.wait_before_request(pid)
+        result = channel.collect(task, persona)
+        result.persona_id = pid
+
+        self._router.record(task.platform, channel_kind, result.grade.value)
+
+        if result.grade in (ResultGrade.OK, ResultGrade.PARTIAL):
+            self._behavior.on_success(pid)
+        elif result.grade == ResultGrade.CAPTCHA:
+            self._behavior.on_captcha(pid)
+            action = self._captcha.handle(result, bad_proxy=proxy_url)
+            if action.retry:
+                return self.run(task, persona_id=pid)
+        elif result.grade == ResultGrade.BLOCKED:
+            self._behavior.on_block(pid)
+
+        self._output.persist(result)
+        return result

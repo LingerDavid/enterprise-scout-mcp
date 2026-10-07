@@ -1,0 +1,26 @@
+# Sidecars for enterprise-scout-mcp integrations.
+
+services:
+  proxy_pool:
+    image: jhao104/proxy_pool:latest
+    ports:
+      - "5010:5010"
+    environment:
+      - DB_CONN=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  ensan_go:
+    build:
+      context: ../ENScan_GO
+      dockerfile: Dockerfile
+    ports:
+      - "31000:31000"
+    volumes:
+      - ../ENScan_GO/config.yaml:/app/config.yaml:ro
+    command: ["./enscan", "-api"]

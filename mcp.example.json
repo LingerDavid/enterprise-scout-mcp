@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "enterprise-scout-mcp": {
+      "command": "E:/Project/enterprise-scout-mcp/.venv/Scripts/enterprise-scout-mcp.exe",
+      "args": [],
+      "cwd": "E:/Project/enterprise-scout-mcp"
+    }
+  }
+}
