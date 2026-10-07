@@ -153,6 +153,20 @@ def cmd_import_neo4j(args: argparse.Namespace) -> int:
     return proc.returncode
 
 
+def cmd_smoke_collect(args: argparse.Namespace) -> int:
+    import subprocess
+
+    script = Path(__file__).resolve().parents[2] / "scripts" / "smoke_collect.py"
+    cmd = [sys.executable, str(script), args.keyword]
+    if args.config:
+        cmd.extend(["-c", args.config])
+    cmd.extend(["-p", args.platform])
+    if args.skip_sidecar_check:
+        cmd.append("--skip-sidecar-check")
+    proc = subprocess.run(cmd, check=False)
+    return proc.returncode
+
+
 def cmd_sync_cookies(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     cookie_src = Path(args.from_file or config.integrations.playwright.cookie_file)
@@ -204,6 +218,12 @@ def build_parser() -> argparse.ArgumentParser:
     smoke = sub.add_parser("smoke-sidecars", help="Probe ENScan and proxy_pool reachability")
     smoke.add_argument("--timeout", type=float, default=2.0)
     smoke.set_defaults(func=cmd_smoke_sidecars)
+
+    smoke_collect = sub.add_parser("smoke-collect", help="Live collect one keyword (integration smoke)")
+    smoke_collect.add_argument("keyword", nargs="?", default="??")
+    smoke_collect.add_argument("-p", "--platform", default="aiqicha")
+    smoke_collect.add_argument("--skip-sidecar-check", action="store_true")
+    smoke_collect.set_defaults(func=cmd_smoke_collect)
 
     personas = sub.add_parser("personas", help="List persona ids")
     personas.set_defaults(func=cmd_personas)

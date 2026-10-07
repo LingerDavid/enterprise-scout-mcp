@@ -1,0 +1,22 @@
+name: test
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d275ad6342d69ef2 # v4.2.2
+
+      - uses: actions/setup-python@8d9ed9ac5c534a4862b577703b285bf8efc4b8ac # v5.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install package and test deps
+        run: pip install -e ".[dev]"
+
+      - name: Run tests
+        run: python -m pytest -q

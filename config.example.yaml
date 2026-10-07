@@ -69,3 +69,10 @@ output:
     partial: "raw"
     captcha: "retry_queue"
     blocked: "dead_letter"
+
+# Neo4j — matches EnterpriseLake docker-compose defaults
+neo4j:
+  enabled: false
+  uri: "bolt://127.0.0.1:7687"
+  user: "neo4j"
+  password: "enterprise-lake-dev"

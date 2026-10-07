@@ -16,21 +16,25 @@ def main() -> int:
     p = argparse.ArgumentParser(description="Import EnterpriseLake warehouse into Neo4j")
     p.add_argument("-c", "--config", default=None)
     p.add_argument("--warehouse-dir", type=Path, default=None)
-    p.add_argument("--uri", default="bolt://127.0.0.1:7687")
-    p.add_argument("--user", default="neo4j")
-    p.add_argument("--password", default="enterprise-lake-dev")
+    p.add_argument("--uri", default=None)
+    p.add_argument("--user", default=None)
+    p.add_argument("--password", default=None)
     p.add_argument("--dry-run", action="store_true", help="Count rows only, no Neo4j write")
     args = p.parse_args()
 
     config = load_config(args.config)
     wh = args.warehouse_dir or Path(config.output.warehouse_dir)
+    neo = config.neo4j
+    uri = args.uri or neo.uri
+    user = args.user or neo.user
+    password = args.password or neo.password
 
     try:
         stats = import_warehouse(
             wh,
-            uri=args.uri,
-            user=args.user,
-            password=args.password,
+            uri=uri,
+            user=user,
+            password=password,
             dry_run=args.dry_run,
         )
     except ImportError as exc:

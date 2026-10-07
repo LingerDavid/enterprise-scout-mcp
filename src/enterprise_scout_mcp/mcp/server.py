@@ -10,6 +10,8 @@ from pathlib import Path
 from enterprise_scout_mcp.batch import parse_keywords, run_batch
 from enterprise_scout_mcp.config import load_config
 from enterprise_scout_mcp.diagnostics.doctor import build_doctor_report
+from enterprise_scout_mcp.diagnostics.sidecars import build_sidecar_report
+from enterprise_scout_mcp.warehouse.neo4j_loader import import_warehouse
 from enterprise_scout_mcp.integrations.enscan_cookies import sync_aiqicha_to_enscan
 from enterprise_scout_mcp.models import CollectTask, Platform
 from enterprise_scout_mcp.scheduler import CollectorScheduler
@@ -84,20 +86,48 @@ def create_mcp_server():
         return json.dumps({"ok": True, "enscan_config": str(enscan), "cookie_preview": preview})
 
     @mcp.tool()
-    def scout_doctor() -> str:
+    def scout_doctor(probe_sidecars: bool = False) -> str:
         """Report availability of ENScan_GO, Playwright, Handaas, and loaded personas."""
         config = load_config()
         scheduler = CollectorScheduler(config)
         try:
             return json.dumps(
-                build_doctor_report(scheduler, config),
+                build_doctor_report(scheduler, config, probe_sidecars=probe_sidecars),
                 ensure_ascii=False,
                 indent=2,
             )
         finally:
             scheduler.close()
 
+    @mcp.tool()
+    def scout_sidecars() -> str:
+        """Live-probe ENScan_GO and proxy_pool sidecars."""
+        config = load_config()
+        return json.dumps(build_sidecar_report(config), ensure_ascii=False, indent=2)
+
+    @mcp.tool()
+    def scout_import_neo4j(dry_run: bool = True) -> str:
+        """Import warehouse parquet into Neo4j (dry_run=True counts rows only)."""
+        config = load_config()
+        wh = Path(config.output.warehouse_dir)
+        neo = config.neo4j
+        try:
+            stats = import_warehouse(
+                wh,
+                uri=neo.uri,
+                user=neo.user,
+                password=neo.password,
+                dry_run=dry_run,
+            )
+        except ImportError as exc:
+            return json.dumps({"ok": False, "error": str(exc)})
+        return json.dumps(
+            {"ok": True, "warehouse_dir": str(wh), "dry_run": dry_run, **stats.to_dict()},
+            ensure_ascii=False,
+        )
+
     return mcp
+
 
 
 def main() -> None:

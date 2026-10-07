@@ -94,6 +94,13 @@ class OutputConfig(BaseModel):
     )
 
 
+class Neo4jConfig(BaseModel):
+    enabled: bool = False
+    uri: str = "bolt://127.0.0.1:7687"
+    user: str = "neo4j"
+    password: str = "enterprise-lake-dev"
+
+
 class AppConfig(BaseModel):
     data_root: str = "G:/enterprise_lake"
     personas: PersonasConfig = Field(default_factory=PersonasConfig)
@@ -101,6 +108,7 @@ class AppConfig(BaseModel):
     routing: RoutingConfig = Field(default_factory=RoutingConfig)
     integrations: IntegrationsConfig = Field(default_factory=IntegrationsConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
+    neo4j: Neo4jConfig = Field(default_factory=Neo4jConfig)
 
 
 def _config_candidates(path: str | Path | None) -> list[Path]:

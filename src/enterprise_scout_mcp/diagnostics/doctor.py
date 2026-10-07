@@ -62,6 +62,11 @@ def build_doctor_report(
             "edges_equity_part": str(edges),
             "edges_exists": edges.is_file(),
         },
+        "neo4j": {
+            "enabled": config.neo4j.enabled,
+            "uri": config.neo4j.uri,
+            "user": config.neo4j.user,
+        },
         "personas": scheduler._persona.list_ids(),
     }
     if probe_sidecars:

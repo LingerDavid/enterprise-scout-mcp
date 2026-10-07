@@ -12,6 +12,8 @@
 | `enterprise_search` | 轻量搜索（depth=0） |
 | `enterprise_collect_batch` | 批量采集（逗号/换行分隔关键词） |
 | `scout_doctor` | 检查 ENScan / Playwright / Handaas / 人设 |
+| `scout_sidecars` | 探活 ENScan / proxy_pool |
+| `scout_import_neo4j` | warehouse parquet → Neo4j（默认 dry_run） |
 
 ## 快速启动
 
@@ -71,6 +73,7 @@ escout sync-cookies --from-file ./secrets/aiqicha_cookies.txt
 escout register-hermes          # 写入 ~/.hermes/config.yaml
 escout doctor --probe           # 含 ENScan / proxy_pool 探活
 escout smoke-sidecars           # 仅 sidecar 探活（CI/脚本用）
+escout smoke-collect 小米       # 实机采集冒烟（需 ENScan 运行）
 ```
 
 DB 未命中时，`playwright.fetch_on_miss` 会调用 `scripts/aiqicha_fetch_one.py`（httpx + cookie）抓取并 upsert 到 `companies.db`。若 httpx 返回验证码，且 `nodriver_on_captcha: true`，自动回退到 `scripts/aiqicha_fetch_nodriver.py`。
@@ -113,3 +116,5 @@ docker compose up -d proxy_pool
 ```powershell
 pytest -q
 ```
+
+CI: GitHub Actions workflow `.github/workflows/test.yml` runs the same suite on push/PR.
