@@ -91,7 +91,7 @@ def run_batch(
             summary.skipped += 1
             continue
         task = CollectTask(keyword=keyword, platform=platform, fields=fields, depth=depth)
-        result = scheduler.run(task, persona_id=persona_id)
+        result = scheduler.run(task, persona_id=persona_id, import_neo4j=False)
         summary.total += 1
         grade = result.grade.value
         summary.counts[grade] = summary.counts.get(grade, 0) + 1
@@ -116,6 +116,12 @@ def run_batch(
             )
         if stop_on_blocked and grade in ("blocked", "captcha"):
             break
+
+    # One Neo4j merge at batch end (scheduler skips per-item when batch owns it).
+    if summary.total > 0 and any(g in DONE_GRADES for g in summary.counts):
+        neo_stats = scheduler.maybe_import_neo4j()
+        if isinstance(neo_stats, dict):
+            summary.results.append({"neo4j_import": neo_stats})
     return summary
 
 

@@ -85,7 +85,13 @@ class CollectorScheduler:
             accept_language=headers.get("Accept-Language") or persona.locale or None,
         )
 
-    def run(self, task: CollectTask, *, persona_id: str | None = None) -> CollectResult:
+    def run(
+        self,
+        task: CollectTask,
+        *,
+        persona_id: str | None = None,
+        import_neo4j: bool = True,
+    ) -> CollectResult:
         pid = persona_id or self._config.personas.default
         persona = self._persona.load(pid)
 
@@ -154,9 +160,32 @@ class CollectorScheduler:
             self._behavior.on_captcha(pid)
             action = self._captcha.handle(result, bad_proxy=proxy_url)
             if action.retry:
-                return self.run(task, persona_id=pid)
+                return self.run(task, persona_id=pid, import_neo4j=import_neo4j)
         elif result.grade == ResultGrade.BLOCKED:
             self._behavior.on_block(pid)
 
         self._output.persist(result)
+        if import_neo4j and result.grade in (ResultGrade.OK, ResultGrade.PARTIAL):
+            self.maybe_import_neo4j()
         return result
+
+    def maybe_import_neo4j(self) -> dict | None:
+        """Merge warehouse → Neo4j when neo4j.enabled and neo4j.auto_import."""
+        neo = self._config.neo4j
+        if not neo.enabled or not neo.auto_import:
+            return None
+        try:
+            from enterprise_scout_mcp.warehouse.neo4j_loader import import_warehouse
+        except ImportError:
+            return {"ok": False, "error": "neo4j driver / pyarrow not installed"}
+        try:
+            stats = import_warehouse(
+                Path(self._config.output.warehouse_dir),
+                uri=neo.uri,
+                user=neo.user,
+                password=neo.password,
+                dry_run=False,
+            )
+            return {"ok": True, **stats.to_dict()}
+        except Exception as exc:  # noqa: BLE001 — surface to caller, don't fail collect
+            return {"ok": False, "error": str(exc)}

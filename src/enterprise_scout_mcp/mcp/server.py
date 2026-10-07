@@ -14,6 +14,7 @@ from enterprise_scout_mcp.diagnostics.sidecars import build_sidecar_report
 from enterprise_scout_mcp.integrations.enscan_cookies import sync_aiqicha_to_enscan
 from enterprise_scout_mcp.models import CollectTask, Platform
 from enterprise_scout_mcp.scheduler import CollectorScheduler
+from enterprise_scout_mcp.retry import drain_retry_queue
 from enterprise_scout_mcp.warehouse.neo4j_loader import import_warehouse
 
 
@@ -153,6 +154,27 @@ def create_mcp_server():
             {"ok": True, "warehouse_dir": str(wh), "dry_run": dry_run, **stats.to_dict()},
             ensure_ascii=False,
         )
+
+    @mcp.tool()
+    def scout_drain_retry(
+        limit: int = 0,
+        include_partial: bool = False,
+        dry_run: bool = False,
+    ) -> str:
+        """Re-run captcha/failed jobs from raw/retry_queue; archive on success."""
+        config = load_config()
+        scheduler = CollectorScheduler(config)
+        try:
+            summary = drain_retry_queue(
+                scheduler,
+                raw_dir=config.output.raw_dir,
+                limit=limit,
+                include_partial=include_partial,
+                dry_run=dry_run,
+            )
+            return json.dumps(summary.to_dict(), ensure_ascii=False)
+        finally:
+            scheduler.close()
 
     return mcp
 

@@ -39,6 +39,8 @@ class OutputRouter:
             "grade": result.grade.value,
             "persona_id": result.persona_id,
             "message": result.message,
+            "fields": list(result.task.fields),
+            "depth": result.task.depth,
             "data": result.data,
         }
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

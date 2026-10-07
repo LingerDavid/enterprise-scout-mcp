@@ -75,6 +75,7 @@ output:
 # Neo4j — matches EnterpriseLake docker-compose defaults
 neo4j:
   enabled: false
+  auto_import: false  # true → merge warehouse after ok/partial collect & batch
   uri: "bolt://127.0.0.1:7687"
   user: "neo4j"
   password: "enterprise-lake-dev"

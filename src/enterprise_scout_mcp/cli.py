@@ -189,6 +189,25 @@ def cmd_sync_cookies(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_drain_retry(args: argparse.Namespace) -> int:
+    from enterprise_scout_mcp.retry import drain_retry_queue
+
+    config = load_config(args.config)
+    scheduler = CollectorScheduler(config)
+    try:
+        summary = drain_retry_queue(
+            scheduler,
+            raw_dir=config.output.raw_dir,
+            limit=args.limit,
+            include_partial=args.include_partial,
+            dry_run=args.dry_run,
+        )
+        print(json.dumps(summary.to_dict(), ensure_ascii=False, indent=2))
+        return 0 if summary.failed == 0 else 1
+    finally:
+        scheduler.close()
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="escout", description="Enterprise collection orchestrator")
     p.add_argument("-c", "--config", default=None, help="Path to config.yaml")
@@ -250,6 +269,16 @@ def build_parser() -> argparse.ArgumentParser:
     sync.add_argument("--from-file", default=None, help="Cookie file (default: playwright.cookie_file)")
     sync.add_argument("--enscan-config", default=None, help="ENScan config path")
     sync.set_defaults(func=cmd_sync_cookies)
+
+    drain = sub.add_parser("drain-retry", help="Re-run jobs from raw/retry_queue")
+    drain.add_argument("--limit", type=int, default=0, help="Max jobs (0 = all)")
+    drain.add_argument(
+        "--include-partial",
+        action="store_true",
+        help="Also retry grade=partial files under raw/",
+    )
+    drain.add_argument("--dry-run", action="store_true", help="List jobs without collecting")
+    drain.set_defaults(func=cmd_drain_retry)
 
     reg = sub.add_parser("register-hermes", help="Add enterprise-scout-mcp to ~/.hermes/config.yaml")
     reg.add_argument("--dry-run", action="store_true")

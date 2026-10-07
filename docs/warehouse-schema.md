@@ -50,6 +50,19 @@ Extracted from ENScan-style nested sections: `partner` / `stockholder` / `holder
 
 Files: `{platform}_{keyword}_{timestamp}.json`
 
+## Retry queue
+
+Captcha (and optionally refreshed failures) land in `raw/retry_queue/*.json` with
+`keyword` / `platform` / `fields` / `depth` / `persona_id` so they can be replayed:
+
+```powershell
+escout drain-retry --dry-run
+escout drain-retry --limit 50
+escout drain-retry --include-partial   # also raw/*.json with grade=partial
+```
+
+Success → move to `raw/retry_queue/.archive/`.
+
 ## Neo4j import
 
 After `docker compose up -d` in EnterpriseLake:
@@ -59,6 +72,9 @@ pip install -e ".[graph]"
 escout import-neo4j --dry-run
 escout import-neo4j --uri bolt://127.0.0.1:7687 --user neo4j --password enterprise-lake-dev
 ```
+
+Or set `neo4j.enabled: true` and `neo4j.auto_import: true` in `config.yaml` to merge
+after successful collect / batch / drain.
 
 Graph model: `(:Company {id})-[:HOLDS {percent}]->(:Company)` plus optional `[:BRANCH]`.
 Penetration queries: `EnterpriseLake/cypher/equity_penetration.cypher`.

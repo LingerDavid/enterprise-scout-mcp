@@ -97,6 +97,9 @@ class OutputConfig(BaseModel):
 
 class Neo4jConfig(BaseModel):
     enabled: bool = False
+    # When true, merge warehouse parquet into Neo4j after ok/partial collect
+    # (and once at end of collect-batch). Requires pip install -e ".[graph]".
+    auto_import: bool = False
     uri: str = "bolt://127.0.0.1:7687"
     user: str = "neo4j"
     password: str = "enterprise-lake-dev"

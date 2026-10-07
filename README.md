@@ -14,6 +14,7 @@
 | `enterprise_search` | 轻量搜索（depth=0） |
 | `enterprise_collect_batch` | 批量采集（支持 checkpoint） |
 | `sync_enscan_cookies` | 把本地 cookie 写入 ENScan config |
+| `scout_drain_retry` | 重跑 `raw/retry_queue`（成功则归档） |
 | `scout_doctor` | 检查 ENScan / Handaas / 人设（可 probe sidecar） |
 | `scout_sidecars` | 探活 ENScan / proxy_pool |
 | `scout_import_neo4j` | warehouse parquet → Neo4j（默认 dry_run） |
@@ -77,6 +78,8 @@ escout register-hermes          # 写入 ~/.hermes/config.yaml
 escout doctor --probe           # 含 ENScan / proxy_pool 探活
 escout smoke-sidecars           # 仅 sidecar 探活（CI/脚本用）
 escout smoke-collect 小米       # 实机采集冒烟（需 ENScan 运行）
+escout drain-retry --dry-run    # 列出 retry_queue 待重跑任务
+escout drain-retry --limit 20   # 重跑 captcha 队列（成功 → .archive）
 ```
 
 **采集策略：只走 ENScan。** `routing.ensan_only: true`（默认）时，爱企查 / 天眼查 / 快查 / 风鸟一律经 ENScan_GO `:31000`，不做 Playwright/httpx/nodriver 页面直采回退。ENScan 不可用时直接报错。天眼查：`escout collect 关键词 -p tianyancha`（需在 ENScan `config.yaml` 配置 TYC cookie）。
@@ -84,6 +87,8 @@ escout smoke-collect 小米       # 实机采集冒烟（需 ENScan 运行）
 默认 `fields`：`enterprise_info,partner,holds,invest,branch`（写入实体 + 股权边）。可用 `-f` / MCP `fields` 覆盖。
 
 `state_persist: true` 时，日配额与路由成功率写入 `state_dir`（默认 `./.state/`）。`collect-batch --checkpoint` 断点续跑：仅 `ok`/`partial` 记为 done，`error`/`captcha`/`blocked` 下次会重试。
+
+`neo4j.enabled` + `neo4j.auto_import: true` 时，单采 / 批采结束 / drain 成功后会自动 merge warehouse → Neo4j（需 `pip install -e ".[graph]"`）。
 
 ## Warehouse 输出
 

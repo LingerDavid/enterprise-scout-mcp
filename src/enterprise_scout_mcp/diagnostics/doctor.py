@@ -15,6 +15,12 @@ def _resolve(root: Path, rel: str) -> Path:
     return p if p.is_absolute() else root / p
 
 
+def _count_json(directory: Path) -> int:
+    if not directory.is_dir():
+        return 0
+    return sum(1 for _ in directory.glob("*.json"))
+
+
 def build_doctor_report(
     scheduler: CollectorScheduler,
     config: AppConfig,
@@ -69,8 +75,13 @@ def build_doctor_report(
         },
         "neo4j": {
             "enabled": config.neo4j.enabled,
+            "auto_import": config.neo4j.auto_import,
             "uri": config.neo4j.uri,
             "user": config.neo4j.user,
+        },
+        "retry_queue": {
+            "dir": str(Path(config.output.raw_dir) / "retry_queue"),
+            "pending": _count_json(Path(config.output.raw_dir) / "retry_queue"),
         },
         "personas": scheduler._persona.list_ids(),
     }
