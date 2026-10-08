@@ -13,6 +13,7 @@
 | `enterprise_collect` | 按关键词采集（平台 / 深度 / fields / persona） |
 | `enterprise_search` | 轻量搜索（depth=0） |
 | `enterprise_collect_batch` | 批量采集（支持 checkpoint） |
+| `scout_sessions` | 查看统一 cookie 注册表（GSXT / 爱企查 / ENScan） |
 | `sync_enscan_cookies` | 把本地 cookie 写入 ENScan config |
 | `scout_drain_retry` | 重跑 `raw/retry_queue`（成功则归档） |
 | `scout_doctor` | 检查 ENScan / Handaas / 人设（可 probe sidecar） |
@@ -73,13 +74,17 @@ escout collect 小米 -p aiqicha
 escout collect-batch --file keywords.txt -p aiqicha --checkpoint .state/batch.json
 escout import-neo4j --dry-run    # 统计 warehouse 行数
 escout import-neo4j              # 写入 Neo4j（需 pip install -e ".[graph]"）
-escout sync-cookies --from-file ./secrets/aiqicha_cookies.txt
+escout sessions list                              # 统一查看 cookie 路径与就绪状态
+escout sessions import gsxt --from-file cookies.json
+escout sessions import aiqicha --from-file ./secrets/aiqicha_cookies.txt
+escout sessions warmup gsxt                       # 无头浏览器刷新 JSL+CT（需 .[browser]）
+escout sync-cookies --from-file ./secrets/aiqicha_cookies.txt   # 兼容别名 → sessions import aiqicha
 escout register-hermes          # 写入 ~/.hermes/config.yaml
-escout doctor --probe           # 含 ENScan / proxy_pool 探活
+escout doctor --probe           # 含 ENScan / proxy_pool 探活 + sessions
 escout smoke-sidecars           # 仅 sidecar 探活（CI/脚本用）
 escout smoke-collect 小米       # 实机采集冒烟（需 ENScan 运行）
-escout sync-gsxt-session --from-file cookies.json   # L1 个人登录 cookie（浏览器 JSON 数组可直导）
-escout sync-gsxt-session --warmup                   # 无头浏览器刷新 JSL+CT（需 .[browser] + Node.js）
+escout sync-gsxt-session --from-file cookies.json   # 兼容别名 → sessions import gsxt
+escout sync-gsxt-session --warmup                   # 兼容别名 → sessions warmup gsxt
 escout collect 苏州挚途 --dims registry --prefer-tier l1 -p gsxt
 escout smoke-registry-l1 苏州挚途                  # L1 registry 穿通验收
 escout drain-retry --dry-run    # 列出 retry_queue 待重跑任务

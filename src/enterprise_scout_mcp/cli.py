@@ -12,8 +12,7 @@ from enterprise_scout_mcp.batch import keywords_from_file, run_batch
 from enterprise_scout_mcp.config import load_config
 from enterprise_scout_mcp.diagnostics.doctor import build_doctor_report
 from enterprise_scout_mcp.diagnostics.sidecars import build_sidecar_report
-from enterprise_scout_mcp.integrations.enscan_cookies import sync_aiqicha_to_enscan
-from enterprise_scout_mcp.integrations.gsxt_session import import_session_file
+from enterprise_scout_mcp.sessions.registry import import_session, list_sessions, warmup_gsxt_session
 from enterprise_scout_mcp.models import CollectTask, Dimension, Platform, SourceTier
 from enterprise_scout_mcp.persona.engine import PersonaEngine
 from enterprise_scout_mcp.scheduler import CollectorScheduler
@@ -207,81 +206,82 @@ def cmd_smoke_collect(args: argparse.Namespace) -> int:
     return proc.returncode
 
 
+def _print_json(payload: dict) -> None:
+    text = json.dumps(payload, ensure_ascii=False, indent=2)
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        sys.stdout.buffer.write(text.encode("utf-8", errors="replace"))
+        sys.stdout.buffer.write(b"\n")
+
+
+def cmd_sessions(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    if args.sessions_cmd == "list":
+        _print_json(list_sessions(config))
+        return 0
+    if args.sessions_cmd == "import":
+        if not args.from_file:
+            print("error: --from-file required", file=sys.stderr)
+            return 2
+        try:
+            result = import_session(config, args.name, from_file=Path(args.from_file))
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+        _print_json(result)
+        return 0
+    if args.sessions_cmd == "warmup":
+        if args.name != "gsxt":
+            print("error: warmup only supports gsxt", file=sys.stderr)
+            return 2
+        if args.from_file:
+            import_session(config, "gsxt", from_file=Path(args.from_file))
+        try:
+            result = warmup_gsxt_session(config)
+        except RuntimeError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        _print_json(result)
+        return 0
+    return 2
+
+
 def cmd_sync_cookies(args: argparse.Namespace) -> int:
     config = load_config(args.config)
-    cookie_src = Path(args.from_file or config.integrations.playwright.cookie_file)
-    enscan_cfg = Path(args.enscan_config or config.integrations.ensan_go.config_path)
-    preview = sync_aiqicha_to_enscan(cookie_source=cookie_src, enscan_config=enscan_cfg)
-    print(json.dumps({"ok": True, "enscan_config": str(enscan_cfg), "cookie_preview": preview}))
+    if not args.from_file:
+        print("error: --from-file required (or use: escout sessions import aiqicha)", file=sys.stderr)
+        return 2
+    try:
+        result = import_session(config, "aiqicha", from_file=Path(args.from_file))
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    _print_json(result)
     return 0
 
 
 def cmd_sync_gsxt_session(args: argparse.Namespace) -> int:
     config = load_config(args.config)
-    from enterprise_scout_mcp.config import resolve_project_root
-
-    dest = Path(args.session_file or config.integrations.gsxt.session_file)
-    if not dest.is_absolute():
-        dest = resolve_project_root(args.config) / dest
-
     if args.warmup:
-        from enterprise_scout_mcp.integrations.gsxt_session import load_session
-        from enterprise_scout_mcp.integrations.gsxt_warmup import warmup_and_save
-
-        existing = None
         if args.from_file:
-            src = Path(args.from_file)
-            import_session_file(src, dest)
-            raw = load_session(dest)
-            if raw and isinstance(raw.get("cookies"), dict):
-                existing = raw["cookies"]
-        elif dest.is_file():
-            raw = load_session(dest)
-            if raw and isinstance(raw.get("cookies"), dict):
-                existing = raw["cookies"]
-        gsxt = config.integrations.gsxt
-        data_dir = Path(gsxt.browser_user_data_dir)
-        if not data_dir.is_absolute():
-            data_dir = resolve_project_root(args.config) / data_dir
-        result = warmup_and_save(
-            dest,
-            index_url=gsxt.base_url.rstrip("/") + "/index.html",
-            wait_seconds=gsxt.browser_warmup_wait_seconds,
-            user_data_dir=data_dir,
-            existing=existing,
-        )
-        print(
-            json.dumps(
-                {
-                    "ok": True,
-                    "session_file": str(dest),
-                    "mode": args.mode,
-                    "warmup": True,
-                    **result,
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
+            import_session(config, "gsxt", from_file=Path(args.from_file))
+        try:
+            result = warmup_gsxt_session(config)
+        except RuntimeError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        _print_json({**result, "mode": args.mode})
         return 0
-
     if not args.from_file:
         print("error: --from-file required unless --warmup", file=sys.stderr)
         return 2
-    src = Path(args.from_file)
-    preview = import_session_file(src, dest)
-    print(
-        json.dumps(
-            {
-                "ok": True,
-                "session_file": str(dest),
-                "mode": args.mode,
-                "cookie_preview": preview,
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-    )
+    try:
+        result = import_session(config, "gsxt", from_file=Path(args.from_file))
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    _print_json({**result, "mode": args.mode})
     return 0
 
 
@@ -403,9 +403,22 @@ def build_parser() -> argparse.ArgumentParser:
     personas = sub.add_parser("personas", help="List persona ids")
     personas.set_defaults(func=cmd_personas)
 
-    sync = sub.add_parser("sync-cookies", help="Push aiqicha cookie into ENScan_GO config.yaml")
-    sync.add_argument("--from-file", default=None, help="Cookie file (default: playwright.cookie_file)")
-    sync.add_argument("--enscan-config", default=None, help="ENScan config path")
+    sess = sub.add_parser("sessions", help="Unified cookie/session registry (config.sessions.*)")
+    sess_sub = sess.add_subparsers(dest="sessions_cmd", required=True)
+    sess_list = sess_sub.add_parser("list", help="Show all session paths and readiness")
+    sess_list.set_defaults(func=cmd_sessions, sessions_cmd="list")
+    sess_import = sess_sub.add_parser("import", help="Import browser export into a session slot")
+    sess_import.add_argument("name", choices=["gsxt", "aiqicha"])
+    sess_import.add_argument("--from-file", required=True, help="Browser export or cookie text file")
+    sess_import.set_defaults(func=cmd_sessions, sessions_cmd="import")
+    sess_warmup = sess_sub.add_parser("warmup", help="Browser refresh session cookies")
+    sess_warmup.add_argument("name", choices=["gsxt"], default="gsxt", nargs="?")
+    sess_warmup.add_argument("--from-file", default=None, help="Optional import before warmup")
+    sess_warmup.set_defaults(func=cmd_sessions, sessions_cmd="warmup")
+
+    sync = sub.add_parser("sync-cookies", help="[alias] escout sessions import aiqicha")
+    sync.add_argument("--from-file", default=None, help="Cookie file")
+    sync.add_argument("--enscan-config", default=None, help="Ignored — uses integrations.ensan_go.config_path")
     sync.set_defaults(func=cmd_sync_cookies)
 
     gsxt_sess = sub.add_parser(

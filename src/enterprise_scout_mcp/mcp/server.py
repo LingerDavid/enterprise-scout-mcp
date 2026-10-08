@@ -11,8 +11,7 @@ from enterprise_scout_mcp.config import load_config
 from enterprise_scout_mcp.defaults import DEFAULT_REGISTRY_FIELDS
 from enterprise_scout_mcp.diagnostics.doctor import build_doctor_report
 from enterprise_scout_mcp.diagnostics.sidecars import build_sidecar_report
-from enterprise_scout_mcp.integrations.enscan_cookies import sync_aiqicha_to_enscan
-from enterprise_scout_mcp.integrations.gsxt_session import import_session_file
+from enterprise_scout_mcp.sessions.registry import import_session, list_sessions, warmup_gsxt_session
 from enterprise_scout_mcp.models import CollectTask, Dimension, Platform, SourceTier
 from enterprise_scout_mcp.scheduler import CollectorScheduler
 from enterprise_scout_mcp.retry import drain_retry_queue
@@ -120,26 +119,30 @@ def create_mcp_server():
         )
 
     @mcp.tool()
+    def scout_sessions() -> str:
+        """List unified session/cookie registry (GSXT L1, aiqicha L2, ENScan mirror)."""
+        return json.dumps(list_sessions(load_config()), ensure_ascii=False)
+
+    @mcp.tool()
     def sync_gsxt_session(cookie_file: str) -> str:
         """Import GSXT personal-login cookies after browser login at shiming.gsxt.gov.cn."""
-        config = load_config()
-        src = Path(cookie_file)
-        dest = Path(config.integrations.gsxt.session_file)
-        if not dest.is_absolute():
-            from enterprise_scout_mcp.config import resolve_project_root
-
-            dest = resolve_project_root() / dest
-        preview = import_session_file(src, dest)
-        return json.dumps({"ok": True, "session_file": str(dest), "cookie_preview": preview})
+        result = import_session(load_config(), "gsxt", from_file=Path(cookie_file))
+        return json.dumps(result, ensure_ascii=False)
 
     @mcp.tool()
     def sync_enscan_cookies(cookie_file: str = "") -> str:
-        """Push aiqicha cookie from local file into ENScan_GO config.yaml."""
+        """Import aiqicha cookie and sync into ENScan_GO config.yaml."""
         config = load_config()
-        src = Path(cookie_file or config.integrations.playwright.cookie_file)
-        enscan = Path(config.integrations.ensan_go.config_path)
-        preview = sync_aiqicha_to_enscan(cookie_source=src, enscan_config=enscan)
-        return json.dumps({"ok": True, "enscan_config": str(enscan), "cookie_preview": preview})
+        if not cookie_file:
+            from enterprise_scout_mcp.config import resolve_project_root
+
+            src = resolve_project_root() / config.sessions.aiqicha_path(config)
+            if not src.is_file():
+                return json.dumps({"ok": False, "error": f"cookie file missing: {src}"})
+            result = import_session(config, "aiqicha", from_file=src)
+        else:
+            result = import_session(config, "aiqicha", from_file=Path(cookie_file))
+        return json.dumps(result, ensure_ascii=False)
 
     @mcp.tool()
     def scout_doctor(probe_sidecars: bool = False) -> str:

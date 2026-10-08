@@ -4,6 +4,13 @@ data_root: "G:/enterprise_lake"
 state_dir: "./.state"
 state_persist: true  # persist daily quotas + routing success rates
 
+# Unified cookie/session store — single place for paths (wires integrations.* on load)
+sessions:
+  dir: "./.state"
+  gsxt: "gsxt_personal_session.json"       # L1 GSXT personal login (JSON)
+  aiqicha: "./secrets/aiqicha_cookies.txt" # L2 爱企查 cookie header (text)
+  export_inbox: "./.state/session_exports"   # drop browser JSON exports here
+
 personas:
   dir: "./personas"
   default: "desktop_chrome_cn"

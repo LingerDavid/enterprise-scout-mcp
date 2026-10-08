@@ -13,4 +13,5 @@ nodriver_data/
 .tmp_*
 .state/
 .state/gsxt_nodriver_data/
+.state/session_exports/
 G:/

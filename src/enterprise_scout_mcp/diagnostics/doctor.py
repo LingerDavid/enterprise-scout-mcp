@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from enterprise_scout_mcp.config import AppConfig, resolve_project_root
+from enterprise_scout_mcp.sessions.registry import list_sessions
 from enterprise_scout_mcp.diagnostics.sidecars import build_sidecar_report
 from enterprise_scout_mcp.models import ChannelKind, Dimension
 from enterprise_scout_mcp.scheduler import CollectorScheduler
@@ -116,6 +117,7 @@ def build_doctor_report(
             "pending": _count_json(Path(config.output.raw_dir) / "retry_queue"),
         },
         "personas": scheduler._persona.list_ids(),
+        "sessions": list_sessions(config),
     }
     if probe_sidecars:
         report["sidecars"] = build_sidecar_report(config)

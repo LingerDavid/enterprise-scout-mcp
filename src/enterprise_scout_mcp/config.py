@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class EnsanGoConfig(BaseModel):
@@ -48,12 +48,32 @@ class CurlCffiConfig(BaseModel):
     impersonate: str = "chrome131"
 
 
+class SessionsConfig(BaseModel):
+    """Unified cookie/session store — authoritative paths for GSXT L1 and aiqicha L2."""
+
+    dir: str = "./.state"
+    gsxt: str = "gsxt_personal_session.json"
+    aiqicha: str = "./secrets/aiqicha_cookies.txt"
+    export_inbox: str = "./.state/session_exports"
+
+    def gsxt_path(self, config: AppConfig | None = None) -> str:
+        _ = config
+        p = Path(self.gsxt)
+        if p.is_absolute():
+            return str(p)
+        return str(Path(self.dir) / self.gsxt)
+
+    def aiqicha_path(self, config: AppConfig | None = None) -> str:
+        _ = config
+        return self.aiqicha
+
+
 class GsxtConfig(BaseModel):
     enabled: bool = True
     base_url: str = "https://www.gsxt.gov.cn"
     shiming_url: str = "https://shiming.gsxt.gov.cn"
     session_mode: str = "personal"  # personal | anonymous
-    session_file: str = "./.state/gsxt_personal_session.json"
+    session_file: str = "./.state/gsxt_personal_session.json"  # wired from sessions.* on load
     search_url: str = "https://www.gsxt.gov.cn/api/search/testAi"
     search_keyword_field: str = "searchword"
     captcha_mode: str = "manual"
@@ -133,12 +153,20 @@ class AppConfig(BaseModel):
     data_root: str = "G:/enterprise_lake"
     state_dir: str = "./.state"
     state_persist: bool = True
+    sessions: SessionsConfig = Field(default_factory=SessionsConfig)
     personas: PersonasConfig = Field(default_factory=PersonasConfig)
     behavior: BehaviorConfig = Field(default_factory=BehaviorConfig)
     routing: RoutingConfig = Field(default_factory=RoutingConfig)
     integrations: IntegrationsConfig = Field(default_factory=IntegrationsConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
     neo4j: Neo4jConfig = Field(default_factory=Neo4jConfig)
+
+    @model_validator(mode="after")
+    def _wire_session_paths(self) -> AppConfig:
+        """Keep integrations.* paths aligned with sessions.* (single source of truth)."""
+        self.integrations.gsxt.session_file = self.sessions.gsxt_path(self)
+        self.integrations.playwright.cookie_file = self.sessions.aiqicha_path(self)
+        return self
 
 
 def _config_candidates(path: str | Path | None) -> list[Path]:
