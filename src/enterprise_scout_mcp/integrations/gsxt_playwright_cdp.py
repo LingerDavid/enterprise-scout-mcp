@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 from pathlib import Path
 from typing import Any
@@ -16,6 +15,11 @@ from enterprise_scout_mcp.channels.official.parse import (
 from enterprise_scout_mcp.config import GsxtConfig
 from enterprise_scout_mcp.integrations.gsxt_browser import BrowserSearchResult
 from enterprise_scout_mcp.integrations.gsxt_dom import submit_gsxt_dom_search_playwright
+from enterprise_scout_mcp.integrations.gsxt_inbrowser import (
+    inbrowser_api_search,
+    search_url_matcher,
+    wait_ruishu_ready,
+)
 from enterprise_scout_mcp.integrations.gsxt_transport import browser_uses_cdp, cdp_launch_hint
 
 
@@ -83,63 +87,25 @@ async def _wait_page_ready(page: Any, timeout: float) -> str | None:
     return last_hint
 
 
-_INBROWSER_SEARCH_FN = """
-async ({ kw, url, field }) => {
-  const body = { pageSize: 10, pageNum: 1 };
-  body[field] = kw;
-  // Method A: call site-native helpers when present (Ruishu params computed in-page)
-  const nativeFns = [
-    () => (typeof pajax !== 'undefined' && pajax.post ? pajax.post(url, body) : null),
-    () => (typeof $ !== 'undefined' && $.ajax ? $.ajax({ url, method: 'POST', data: JSON.stringify(body), contentType: 'application/json', xhrFields: { withCredentials: true } }) : null),
-  ];
-  for (const fn of nativeFns) {
-    try {
-      const native = fn();
-      if (native && typeof native.then === 'function') {
-        const text = await native;
-        if (text && typeof text === 'object') {
-          return { status: 200, text: JSON.stringify(text).slice(0, 50000), via: 'native' };
-        }
-        if (typeof text === 'string' && text.length > 2) {
-          return { status: 200, text: text.slice(0, 50000), via: 'native' };
-        }
-      }
-    } catch (e) { /* fall through to fetch */ }
-  }
-  try {
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(body),
-      credentials: 'include',
-    });
-    const text = await r.text();
-    return { status: r.status, text: text.slice(0, 50000), via: 'fetch' };
-  } catch (e) {
-    return { status: 0, text: String(e), via: 'fetch' };
-  }
-}
-"""
-
-
-async def _inbrowser_api_search(page: Any, keyword: str, config: GsxtConfig) -> dict[str, str] | None:
+async def _dom_search_with_network(page: Any, keyword: str, config: GsxtConfig) -> dict[str, str] | None:
+    """Method A: DOM click triggers site JS; intercept the real search XHR (Ruishu params included)."""
+    matcher = search_url_matcher(config)
+    timeout_ms = int(min(max(config.browser_search_timeout * 1000, 15_000), 45_000))
     try:
-        payload = await page.evaluate(
-            _INBROWSER_SEARCH_FN,
-            {"kw": keyword, "url": config.search_url, "field": config.search_keyword_field},
-        )
-    except Exception:  # noqa: BLE001
+        async with page.expect_response(matcher, timeout=timeout_ms) as resp_info:
+            submit = await submit_gsxt_dom_search_playwright(page, keyword)
+            if isinstance(submit, dict) and not submit.get("ok"):
+                raise RuntimeError(str(submit.get("error") or "search input not found"))
+        response = await resp_info.value
+        if response.status != 200:
+            return None
+        try:
+            parsed = await response.json()
+        except Exception:  # noqa: BLE001
+            parsed = await response.text()
+        return parse_search_payload(parsed)
+    except Exception:  # noqa: BLE001 — timeout, abort, or no matching XHR
         return None
-    if not isinstance(payload, dict):
-        return None
-    text = str(payload.get("text") or "")
-    if classify_browser_block(text) in ("ct_challenge", "blocked"):
-        return None
-    try:
-        parsed = json.loads(text)
-    except json.JSONDecodeError:
-        parsed = text
-    return parse_search_payload(parsed)
 
 
 async def search_registry_playwright_async(
@@ -192,6 +158,16 @@ async def search_registry_playwright_async(
         await asyncio.sleep(2.0)
         ready_wait = min(max(config.browser_search_timeout * 0.5, 15.0), 40.0)
         block = await _wait_page_ready(page, ready_wait)
+        ruishu_wait = min(max(config.browser_search_timeout * 0.4, 10.0), 30.0)
+        if not await wait_ruishu_ready(page, config, ruishu_wait):
+            return BrowserSearchResult(
+                ok=False,
+                message=(
+                    "瑞数环境未就绪 — 在 CDP Chrome 中手动打开 gsxt.gov.cn 并完成验证后再试 "
+                    "(勿对 521/412 换 IP 重试)"
+                ),
+                cookies=await _context_cookies(page),
+            )
         if block == "ct_challenge":
             return BrowserSearchResult(
                 ok=False,
@@ -213,13 +189,24 @@ async def search_registry_playwright_async(
                 html_snippet=(await page.content())[:1500],
             )
 
-        api_row = await _inbrowser_api_search(page, keyword, config)
+        # Method A-1: DOM click → intercept site XHR (Ruishu params computed by page JS)
+        net_row = await _dom_search_with_network(page, keyword, config)
+        if net_row and (net_row.get("name") or net_row.get("credit_code")):
+            return BrowserSearchResult(
+                ok=True,
+                row=net_row,
+                cookies=await _context_cookies(page),
+                message="ok (playwright cdp xhr)",
+            )
+
+        # Method A-2: in-page pajax / $.ajax / fetch
+        api_row = await inbrowser_api_search(page, keyword, config)
         if api_row and (api_row.get("name") or api_row.get("credit_code")):
             return BrowserSearchResult(
                 ok=True,
                 row=api_row,
                 cookies=await _context_cookies(page),
-                message="ok (playwright cdp api)",
+                message="ok (playwright cdp in-browser api)",
             )
 
         submit = await submit_gsxt_dom_search_playwright(page, keyword)
@@ -251,13 +238,13 @@ async def search_registry_playwright_async(
                     cookies=await _context_cookies(page),
                     message="ok (playwright cdp dom)",
                 )
-            api_row = await _inbrowser_api_search(page, keyword, config)
+            api_row = await inbrowser_api_search(page, keyword, config)
             if api_row and (api_row.get("name") or api_row.get("credit_code")):
                 return BrowserSearchResult(
                     ok=True,
                     row=api_row,
                     cookies=await _context_cookies(page),
-                    message="ok (playwright cdp api)",
+                    message="ok (playwright cdp in-browser api)",
                 )
 
         return BrowserSearchResult(

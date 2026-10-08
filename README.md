@@ -96,9 +96,9 @@ escout drain-retry --limit 20   # 重跑 captcha 队列（成功 → .archive）
 
 | 模式 | 配置 | 说明 |
 |------|------|------|
-| **CDP 接管（推荐）** | `browser_cdp_port: 9222` | 手动启动 Chrome 调试端口 → Playwright `connect_over_cdp` → 页面内 `fetch` / 站点原生 ajax |
+| **CDP 接管（推荐）** | `browser_cdp_port: 9222` | 真实 Chrome → Playwright `connect_over_cdp` → **Method A**：DOM 触发站点 XHR（拦截响应）/ `pajax`·`$.ajax` / 页面内 fetch |
 | nodriver 自建 | `browser_cdp_port: 0` | 持久 profile + 有头浏览器；NWAF 仍可能拦截自动化指纹 |
-| httpx API | `search_mode: api` | 仅 JSL 可过；瑞数 Environment Checking 会 412 |
+| httpx API | `search_mode: api` | 仅 JSL 可过；瑞数 Environment Checking 会 412 — **勿对 521/412 换 IP 硬刚** |
 
 ```powershell
 pip install -e ".[browser]"
