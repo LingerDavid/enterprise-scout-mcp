@@ -57,6 +57,9 @@ class GsxtConfig(BaseModel):
     search_url: str = "https://www.gsxt.gov.cn/api/search/testAi"
     search_keyword_field: str = "searchword"
     captcha_mode: str = "manual"
+    browser_warmup_on_ct: bool = True  # nodriver refresh when CT 405 after JSL
+    browser_warmup_wait_seconds: float = 6.0
+    browser_user_data_dir: str = "./.state/gsxt_nodriver_data"
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"

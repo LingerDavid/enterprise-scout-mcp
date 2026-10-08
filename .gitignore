@@ -12,4 +12,5 @@ secrets/
 nodriver_data/
 .tmp_*
 .state/
+.state/gsxt_nodriver_data/
 G:/

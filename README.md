@@ -78,7 +78,8 @@ escout register-hermes          # 写入 ~/.hermes/config.yaml
 escout doctor --probe           # 含 ENScan / proxy_pool 探活
 escout smoke-sidecars           # 仅 sidecar 探活（CI/脚本用）
 escout smoke-collect 小米       # 实机采集冒烟（需 ENScan 运行）
-escout sync-gsxt-session --from-file cookies.json   # L1 个人登录 cookie
+escout sync-gsxt-session --from-file cookies.json   # L1 个人登录 cookie（浏览器 JSON 数组可直导）
+escout sync-gsxt-session --warmup                   # 无头浏览器刷新 JSL+CT（需 .[browser] + Node.js）
 escout collect 苏州挚途 --dims registry --prefer-tier l1 -p gsxt
 escout smoke-registry-l1 苏州挚途                  # L1 registry 穿通验收
 escout drain-retry --dry-run    # 列出 retry_queue 待重跑任务

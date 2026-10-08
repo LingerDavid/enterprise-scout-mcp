@@ -23,3 +23,13 @@ def test_classify_auth_expired():
 
 def test_classify_captcha():
     assert classify_response_text("请完成 geetest 验证码") == "captcha"
+
+
+def test_classify_jsl_challenge():
+    html = '<script>document.cookie=("x");location.href=location.href</script>'
+    assert classify_response_text(html, status_code=521) == "jsl_challenge"
+
+
+def test_classify_ct_challenge():
+    html = '<html><script src="/ctct_bundle_fdab54c7.js"></script></html>'
+    assert classify_response_text(html, status_code=405) == "ct_challenge"

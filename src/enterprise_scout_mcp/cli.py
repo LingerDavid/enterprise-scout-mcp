@@ -218,17 +218,57 @@ def cmd_sync_cookies(args: argparse.Namespace) -> int:
 
 def cmd_sync_gsxt_session(args: argparse.Namespace) -> int:
     config = load_config(args.config)
-    root = Path(config.state_dir)
-    if not root.is_absolute():
-        from enterprise_scout_mcp.config import resolve_project_root
+    from enterprise_scout_mcp.config import resolve_project_root
 
-        root = resolve_project_root(args.config) / root
-    src = Path(args.from_file)
     dest = Path(args.session_file or config.integrations.gsxt.session_file)
     if not dest.is_absolute():
-        from enterprise_scout_mcp.config import resolve_project_root
-
         dest = resolve_project_root(args.config) / dest
+
+    if args.warmup:
+        from enterprise_scout_mcp.integrations.gsxt_session import load_session
+        from enterprise_scout_mcp.integrations.gsxt_warmup import warmup_and_save
+
+        existing = None
+        if args.from_file:
+            src = Path(args.from_file)
+            import_session_file(src, dest)
+            raw = load_session(dest)
+            if raw and isinstance(raw.get("cookies"), dict):
+                existing = raw["cookies"]
+        elif dest.is_file():
+            raw = load_session(dest)
+            if raw and isinstance(raw.get("cookies"), dict):
+                existing = raw["cookies"]
+        gsxt = config.integrations.gsxt
+        data_dir = Path(gsxt.browser_user_data_dir)
+        if not data_dir.is_absolute():
+            data_dir = resolve_project_root(args.config) / data_dir
+        result = warmup_and_save(
+            dest,
+            index_url=gsxt.base_url.rstrip("/") + "/index.html",
+            wait_seconds=gsxt.browser_warmup_wait_seconds,
+            user_data_dir=data_dir,
+            existing=existing,
+        )
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "session_file": str(dest),
+                    "mode": args.mode,
+                    "warmup": True,
+                    **result,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0
+
+    if not args.from_file:
+        print("error: --from-file required unless --warmup", file=sys.stderr)
+        return 2
+    src = Path(args.from_file)
     preview = import_session_file(src, dest)
     print(
         json.dumps(
@@ -258,19 +298,23 @@ def cmd_smoke_registry_l1(args: argparse.Namespace) -> int:
             depth=0,
         )
         result = scheduler.run(task, persona_id=args.persona)
-        print(
-            json.dumps(
-                {
-                    "grade": result.grade.value,
-                    "channel": result.channel.value,
-                    "source_tier": result.source_tier.value if result.source_tier else "",
-                    "message": result.message,
-                    "data": result.data,
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
+        payload = json.dumps(
+            {
+                "grade": result.grade.value,
+                "channel": result.channel.value,
+                "source_tier": result.source_tier.value if result.source_tier else "",
+                "degraded": result.degraded,
+                "message": result.message,
+                "data": result.data,
+            },
+            ensure_ascii=False,
+            indent=2,
         )
+        try:
+            print(payload)
+        except UnicodeEncodeError:
+            sys.stdout.buffer.write(payload.encode("utf-8", errors="replace"))
+            sys.stdout.buffer.write(b"\n")
         return 0 if result.grade.value in ("ok", "partial") else 1
     finally:
         scheduler.close()
@@ -368,7 +412,12 @@ def build_parser() -> argparse.ArgumentParser:
         "sync-gsxt-session",
         help="Import GSXT personal-login cookies (export from browser after shiming login)",
     )
-    gsxt_sess.add_argument("--from-file", required=True, help="JSON cookie export")
+    gsxt_sess.add_argument("--from-file", default=None, help="JSON cookie export (browser / EditThisCookie)")
+    gsxt_sess.add_argument(
+        "--warmup",
+        action="store_true",
+        help="Headless browser refresh JSL+CT cookies (requires pip install -e '.[browser]')",
+    )
     gsxt_sess.add_argument("--session-file", default=None, help="Override session path")
     gsxt_sess.add_argument("--mode", default="personal", choices=["personal"])
     gsxt_sess.set_defaults(func=cmd_sync_gsxt_session)

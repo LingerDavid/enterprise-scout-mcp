@@ -28,25 +28,35 @@ def save_session(path: Path, cookies: dict[str, str], *, note: str = "") -> None
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def cookies_from_export(raw: dict[str, Any]) -> dict[str, str]:
-    """Accept our session file or a flat cookie dict / list of cookie objects."""
+def _cookies_from_list(items: list[Any]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        out[name] = str(item.get("value", ""))
+    return out
+
+
+def cookies_from_export(raw: dict[str, Any] | list[Any]) -> dict[str, str]:
+    """Accept session file, flat dict, or browser extension cookie list."""
+    if isinstance(raw, list):
+        return _cookies_from_list(raw)
     if "cookies" in raw and isinstance(raw["cookies"], dict):
         return {str(k): str(v) for k, v in raw["cookies"].items()}
     if all(isinstance(v, str) for v in raw.values()) and "saved_at" not in raw:
         return {str(k): str(v) for k, v in raw.items()}
     if isinstance(raw.get("cookies"), list):
-        out: dict[str, str] = {}
-        for item in raw["cookies"]:
-            if isinstance(item, dict) and item.get("name"):
-                out[str(item["name"])] = str(item.get("value", ""))
-        return out
+        return _cookies_from_list(raw["cookies"])
     raise ValueError("unrecognized cookie export format")
 
 
 def import_session_file(source: Path, dest: Path) -> dict[str, str]:
     raw = json.loads(source.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ValueError("cookie file must be a JSON object")
+    if not isinstance(raw, (dict, list)):
+        raise ValueError("cookie file must be a JSON object or array")
     cookies = cookies_from_export(raw)
     if not cookies:
         raise ValueError("no cookies found in export")

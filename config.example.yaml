@@ -36,6 +36,8 @@ integrations:
     session_file: "./.state/gsxt_personal_session.json"
     search_url: "https://www.gsxt.gov.cn/api/search/testAi"
     captcha_mode: manual
+    browser_warmup_on_ct: true
+    browser_warmup_wait_seconds: 6
 
   # ENScan_GO — sibling checkout: e:/Project/ENScan_GO (required when ensan_only)
   ensan_go:

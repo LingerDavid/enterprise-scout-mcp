@@ -5,7 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from enterprise_scout_mcp.models import CollectResult, ResultGrade
-from enterprise_scout_mcp.output.entity_schema import entity_row
+from enterprise_scout_mcp.output.entity_schema import ENTITY_COLUMNS, entity_row
+
+
+def _normalize_row(row: dict) -> dict:
+    out = {col: row.get(col) for col in ENTITY_COLUMNS}
+    if out.get("degraded") is None:
+        out["degraded"] = False
+    return out
 
 
 def append_entity(result: CollectResult, warehouse_dir: Path) -> Path | None:
@@ -22,12 +29,12 @@ def append_entity(result: CollectResult, warehouse_dir: Path) -> Path | None:
     entities_dir.mkdir(parents=True, exist_ok=True)
     part_path = entities_dir / "part.parquet"
 
-    row = entity_row(result)
+    row = _normalize_row(entity_row(result))
     row["message"] = result.message
-    table = pa.Table.from_pylist([row])
-
+    rows = [row]
     if part_path.is_file():
-        existing = pq.read_table(part_path)
-        table = pa.concat_tables([existing, table])
+        existing = pq.read_table(part_path).to_pylist()
+        rows = [_normalize_row(r) for r in existing] + rows
+    table = pa.Table.from_pylist(rows)
     pq.write_table(table, part_path)
     return part_path

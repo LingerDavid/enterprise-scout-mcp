@@ -107,9 +107,13 @@ def _parse_html(html: str) -> dict[str, str] | None:
     }
 
 
-def classify_response_text(text: str) -> str | None:
-    """Return captcha/auth_expired/block hint or None."""
+def classify_response_text(text: str, *, status_code: int = 0) -> str | None:
+    """Return captcha/auth_expired/block/challenge hint or None."""
     lower = text.lower()
+    if status_code == 521 or ("document.cookie" in text and "location.href" in text):
+        return "jsl_challenge"
+    if status_code == 405 or "environment checking" in lower or "ctct_bundle" in lower:
+        return "ct_challenge"
     if "实名注册" in text or "登录后再进行访问" in text or "auth" in lower and "login" in lower:
         return "auth_expired"
     if "geetest" in lower or "验证码" in text or "captcha" in lower:
