@@ -7,7 +7,17 @@ import re
 from typing import Any
 
 
-_CREDIT_CODE_RE = re.compile(r"\b([0-9A-Z]{18})\b")
+# 统一社会信用代码（国标字符集，避免把页面 hash 当成信用代码）
+_CREDIT_CODE_RE = re.compile(r"\b([0-9A-HJ-NPQRTUWXY]{2}\d{6}[0-9A-HJ-NPQRTUWXY]{10})\b")
+_USCC_LOOSE_RE = re.compile(
+    r"统一社会信用代码[：:\s]*</?(?:span|div|font|i|b)[^>]*>\s*"
+    r"([0-9A-HJ-NPQRTUWXY]{2}\d{6}[0-9A-HJ-NPQRTUWXY]{10})",
+    flags=re.IGNORECASE,
+)
+_USCC_TEXT_RE = re.compile(
+    r"统一社会信用代码[：:\s]{0,40}"
+    r"([0-9A-HJ-NPQRTUWXY]{2}\d{6}[0-9A-HJ-NPQRTUWXY]{10})",
+)
 
 
 def parse_search_payload(payload: Any) -> dict[str, str] | None:
@@ -92,62 +102,103 @@ def _pick(row: dict[str, Any], keys: tuple[str, ...]) -> str:
     return ""
 
 
-def parse_search_html(html: str, keyword: str = "") -> dict[str, str] | None:
-    """Parse GSXT search result page — embedded JSON, tables, or list markup."""
-    if not html or classify_response_text(html) in ("ct_challenge", "jsl_challenge"):
+def _strip_tags(raw: str) -> str:
+    return re.sub(r"<[^>]+>", "", raw).replace("&nbsp;", " ").strip()
+
+
+def _row_from_search_list_item(item_html: str, keyword: str = "") -> dict[str, str] | None:
+    """Parse one GSXT `.search_list_item` card (name in h1, USCC in span.g3)."""
+    name = ""
+    h1 = re.search(r"<h1[^>]*>([\s\S]*?)</h1>", item_html, flags=re.IGNORECASE)
+    if h1:
+        name = _strip_tags(h1.group(1))
+    credit = ""
+    for pat in (_USCC_LOOSE_RE, _USCC_TEXT_RE, _CREDIT_CODE_RE):
+        m = pat.search(item_html)
+        if m:
+            credit = m.group(1)
+            break
+    if keyword and name and keyword not in name:
         return None
+    if not name and not credit:
+        return None
+    return {"name": name, "credit_code": credit, "reg_code": credit}
+
+
+def parse_search_html(html: str, keyword: str = "") -> dict[str, str] | None:
+    """Parse GSXT search result page — list cards, embedded JSON, or text USCC."""
+    if not html:
+        return None
+    # Use browser classifier — classify_response_text false-positives on ctct_bundle/geetest
+    # that are embedded on every normal GSXT result page.
+    block = classify_browser_block(html)
+    if block in ("ct_challenge", "jsl_challenge", "blocked"):
+        return None
+    if "search_list_item" not in html.lower() and "统一社会信用代码" not in html:
+        if block == "captcha" or classify_response_text(html) in ("ct_challenge", "jsl_challenge"):
+            return None
+
+    # Prefer structured result cards (corp-query-search-*.html)
+    for m in re.finditer(
+        r'<a[^>]*class="[^"]*search_list_item[^"]*"[^>]*>([\s\S]*?)</a>',
+        html,
+        flags=re.IGNORECASE,
+    ):
+        row = _row_from_search_list_item(m.group(0), keyword=keyword)
+        if row and (row.get("credit_code") or row.get("name")):
+            return row
 
     for pattern in (
-        r"uniscId[\"']?\s*[:=]\s*[\"']([0-9A-Z]{18})[\"']",
-        r"creditCode[\"']?\s*[:=]\s*[\"']([0-9A-Z]{18})[\"']",
-        r"统一社会信用代码[^0-9A-Z]{0,20}([0-9A-Z]{18})",
+        r"uniscId[\"']?\s*[:=]\s*[\"']([0-9A-HJ-NPQRTUWXY]{18})[\"']",
+        r"creditCode[\"']?\s*[:=]\s*[\"']([0-9A-HJ-NPQRTUWXY]{18})[\"']",
+        r"统一社会信用代码[\s\S]{0,120}?([0-9A-HJ-NPQRTUWXY]{2}\d{6}[0-9A-HJ-NPQRTUWXY]{10})",
     ):
-        for block in re.finditer(
-            r".{0,400}?" + pattern,
-            html,
-            flags=re.IGNORECASE | re.DOTALL,
-        ):
-            chunk = block.group(0)
-            code_m = re.search(pattern, chunk, flags=re.IGNORECASE)
-            if not code_m:
-                continue
-            credit = code_m.group(1)
+        for block in re.finditer(pattern, html, flags=re.IGNORECASE | re.DOTALL):
+            credit = block.group(1)
+            # look backward for company name near the USCC
+            start = max(0, block.start() - 500)
+            chunk = html[start : block.end()]
             name = ""
             for name_pat in (
                 r"entName[\"']?\s*[:=]\s*[\"']([^\"']+)[\"']",
                 r"corpName[\"']?\s*[:=]\s*[\"']([^\"']+)[\"']",
+                r"<h1[^>]*>([\s\S]*?)</h1>",
                 r"<a[^>]*>([^<]{2,80})</a>",
-                r"<span[^>]*class=\"[^\"']*name[^\"']*\"[^>]*>([^<]+)</span>",
             ):
                 nm = re.search(name_pat, chunk, flags=re.IGNORECASE)
                 if nm:
-                    name = nm.group(1).strip()
+                    name = _strip_tags(nm.group(1))
                     break
             if keyword and name and keyword not in name:
                 continue
             if name or credit:
                 return {"name": name, "credit_code": credit, "reg_code": credit}
 
-    row = _parse_html(html)
-    if row and keyword and row.get("name") and keyword not in row["name"]:
-        codes = _CREDIT_CODE_RE.findall(html)
-        if len(codes) == 1:
-            row = {**row, "credit_code": codes[0], "reg_code": codes[0]}
-    return row
+    return _parse_html(html, keyword=keyword)
 
 
-def _parse_html(html: str) -> dict[str, str] | None:
+def _parse_html(html: str, *, keyword: str = "") -> dict[str, str] | None:
+    # Geetest scripts are normal on GSXT result pages — only block standalone captcha walls
     lower = html.lower()
-    if "geetest" in lower or "验证码" in html or "captcha" in lower:
+    has_results = "search_list_item" in lower or "统一社会信用代码" in html
+    if not has_results and ("geetest" in lower or "验证码" in html or "captcha" in lower):
         return None
     name_m = re.search(r'entName["\']?\s*[:=]\s*["\']([^"\']+)', html)
-    code_m = _CREDIT_CODE_RE.search(html)
-    if not name_m and not code_m:
+    name = name_m.group(1) if name_m else ""
+    if not name:
+        h1 = re.search(r"<h1[^>]*>([\s\S]*?)</h1>", html, flags=re.IGNORECASE)
+        if h1:
+            name = _strip_tags(h1.group(1))
+    code_m = _USCC_LOOSE_RE.search(html) or _USCC_TEXT_RE.search(html) or _CREDIT_CODE_RE.search(html)
+    credit = code_m.group(1) if code_m else ""
+    if keyword and name and keyword not in name:
+        return None
+    if not name and not credit:
         return None
     return {
-        "name": name_m.group(1) if name_m else "",
-        "credit_code": code_m.group(1) if code_m else "",
-        "reg_code": code_m.group(1) if code_m else "",
+        "name": name,
+        "credit_code": credit,
+        "reg_code": credit,
     }
 
 

@@ -192,6 +192,18 @@ async def search_registry_playwright_async(
                 html_snippet=(await page.content())[:1500],
             )
 
+        # Already on corp-query-search results — parse before re-triggering geetest/JSL
+        page_url = page.url or ""
+        if "corp-query-search" in page_url:
+            existing = parse_search_html(await page.content(), keyword=keyword)
+            if existing and (existing.get("name") or existing.get("credit_code")):
+                return BrowserSearchResult(
+                    ok=True,
+                    row=existing,
+                    cookies=await _context_cookies(page),
+                    message="ok (playwright cdp existing results)",
+                )
+
         # Method A-1: DOM click → intercept site XHR (Ruishu params computed by page JS)
         net_row = await _dom_search_with_network(page, keyword, config)
         if net_row and (net_row.get("name") or net_row.get("credit_code")):
