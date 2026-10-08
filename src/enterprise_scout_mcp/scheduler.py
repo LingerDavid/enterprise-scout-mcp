@@ -18,11 +18,13 @@ from enterprise_scout_mcp.models import (
     CollectResult,
     CollectTask,
     ResultGrade,
+    SourceTier,
 )
+from enterprise_scout_mcp.output.conflict_schema import detect_registry_conflicts
 from enterprise_scout_mcp.output.router import OutputRouter
 from enterprise_scout_mcp.persona.engine import PersonaEngine
 from enterprise_scout_mcp.routing.risk_router import RiskAwareRouter
-from enterprise_scout_mcp.routing.tier_router import TierAwareRouter
+from enterprise_scout_mcp.routing.tier_router import RouteDecision, TierAwareRouter
 from enterprise_scout_mcp.state.store import StateStore
 from enterprise_scout_mcp.transport.curl_cffi_backend import CurlCffiTransport
 from enterprise_scout_mcp.transport.egress import EgressContext
@@ -98,13 +100,18 @@ class CollectorScheduler:
             return True
         return self._config.routing.source_policy == "tiered"
 
+    def _route_decision(self, task: CollectTask) -> RouteDecision | None:
+        if not self._use_tier_router(task):
+            return None
+        return self._tier_router.select(
+            task,
+            gsxt_available=self._channels[ChannelKind.GSXT_OFFICIAL].available(),
+            ensan_available=self._channels[ChannelKind.ENSCAN_GO].available(),
+        )
+
     def _select_channel(self, task: CollectTask) -> ChannelKind:
-        if self._use_tier_router(task):
-            decision = self._tier_router.select(
-                task,
-                gsxt_available=self._channels[ChannelKind.GSXT_OFFICIAL].available(),
-                ensan_available=self._channels[ChannelKind.ENSCAN_GO].available(),
-            )
+        decision = self._route_decision(task)
+        if decision is not None:
             return decision.channel
         return self._router.select_channel(
             task,
@@ -112,6 +119,38 @@ class CollectorScheduler:
             playwright_available=self._channels[ChannelKind.PLAYWRIGHT].available(),
             handaas_available=self._channels[ChannelKind.HANDAAS_API].available(),
         )
+
+    def _try_l1_l2_fallback(
+        self,
+        task: CollectTask,
+        persona,
+        egress: EgressContext,
+        l1_result: CollectResult,
+        *,
+        route: RouteDecision,
+    ) -> CollectResult | None:
+        if not self._config.routing.l1_fallback_to_l2:
+            return None
+        if route.channel != ChannelKind.GSXT_OFFICIAL:
+            return None
+        if l1_result.grade == ResultGrade.OK:
+            return None
+        ensan = self._channels[ChannelKind.ENSCAN_GO]
+        if not ensan.available():
+            return None
+        l2 = ensan.collect(task, persona, egress=egress)
+        l2.source_tier = SourceTier.L2
+        l2.dimension = route.dimension
+        if l2.grade in (ResultGrade.OK, ResultGrade.PARTIAL):
+            l2.degraded = True
+            l1_note = l1_result.message or l1_result.grade.value
+            l2.message = f"L1→L2 fallback (L1={l1_result.grade.value}: {l1_note}); {l2.message or 'ok'}"
+            conflicts = detect_registry_conflicts(l1_result, l2)
+            if conflicts:
+                self._output.persist_conflicts(conflicts, l2)
+            return l2
+        l1_result.message = f"{l1_result.message}; L2 fallback failed: {l2.message or l2.grade.value}"
+        return l1_result
 
     def run(
         self,
@@ -133,8 +172,9 @@ class CollectorScheduler:
                 persona_id=pid,
             )
 
+        route = self._route_decision(task)
         try:
-            channel_kind = self._select_channel(task)
+            channel_kind = route.channel if route else self._select_channel(task)
         except RuntimeError as exc:
             return CollectResult(
                 task=task,
@@ -174,12 +214,22 @@ class CollectorScheduler:
         self._behavior.wait_before_request(pid)
         result = channel.collect(task, persona, egress=egress)
         result.persona_id = pid
+        if route is not None:
+            result.source_tier = result.source_tier or route.source_tier
+            result.dimension = result.dimension or route.dimension
+
+        fallback: CollectResult | None = None
+        if route is not None:
+            fallback = self._try_l1_l2_fallback(task, persona, egress, result, route=route)
+            if fallback is not None:
+                result = fallback
+                channel_kind = result.channel
 
         self._router.record(task.platform, channel_kind, result.grade.value)
 
         if result.grade in (ResultGrade.OK, ResultGrade.PARTIAL):
             self._behavior.on_success(pid)
-        elif result.grade in (ResultGrade.CAPTCHA, ResultGrade.AUTH_EXPIRED):
+        elif fallback is None and result.grade in (ResultGrade.CAPTCHA, ResultGrade.AUTH_EXPIRED):
             self._behavior.on_captcha(pid)
             action = self._captcha.handle(result, bad_proxy=proxy_url)
             if action.retry:

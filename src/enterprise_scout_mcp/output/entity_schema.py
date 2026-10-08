@@ -23,6 +23,7 @@ ENTITY_COLUMNS = (
     "collected_at",
     "payload_json",
     "message",
+    "degraded",
 )
 
 # ENScan ENSMapLN + GSXT / legacy keys.
@@ -98,4 +99,5 @@ def entity_row(result: CollectResult) -> dict[str, Any]:
         "collected_at": datetime.now(timezone.utc).isoformat(),
         "payload_json": json.dumps(data, ensure_ascii=False),
         "message": result.message or "",
+        "degraded": result.degraded,
     }

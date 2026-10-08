@@ -92,6 +92,7 @@ class RoutingConfig(BaseModel):
     source_policy: str = "ensan_only"  # ensan_only | tiered
     ensan_only: bool = True
     gsxt_allow_unavailable: bool = True  # route to GSXT even without session (returns auth_expired)
+    l1_fallback_to_l2: bool = True  # tiered L1 registry fail → ENScan L2 with degraded=true
     min_success_rate_for_enscan: float = 0.0
     prefer_enscan_for: list[str] = Field(
         default_factory=lambda: ["icp", "app", "wechat", "invest", "branch", "partner", "holds"]

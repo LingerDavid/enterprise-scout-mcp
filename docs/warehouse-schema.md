@@ -21,6 +21,26 @@ One row per successful or partial collect (`grade` in `ok`, `partial`).
 | `collected_at` | string | UTC ISO-8601 timestamp |
 | `payload_json` | string | Full channel payload (JSON) |
 | `message` | string | Orchestrator / channel message |
+| `credit_code` | string | 18-digit 统一社会信用代码（优先作 `entity_id`） |
+| `source_tier` | string | `l1` / `l2` / `l3` |
+| `dimension` | string | `registry`, `equity`, … |
+| `degraded` | bool | `true` when L2 used after L1 registry failure |
+
+## conflicts/part.parquet
+
+Written when tiered L1→L2 fallback finds mismatched registry identity fields.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `query_keyword` | string | Original search keyword |
+| `field` | string | `credit_code` or `name` |
+| `l1_value` | string | L1 GSXT snapshot |
+| `l2_value` | string | L2 ENScan snapshot |
+| `l1_grade` / `l2_grade` | string | Collect grades |
+| `l1_channel` / `l2_channel` | string | Channel kinds |
+| `platform` | string | Task platform |
+| `collected_at` | string | UTC ISO-8601 |
+| `message` | string | Conflict summary |
 
 ## edges/equity/part.parquet
 

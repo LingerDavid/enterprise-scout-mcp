@@ -85,7 +85,7 @@ escout drain-retry --dry-run    # 列出 retry_queue 待重跑任务
 escout drain-retry --limit 20   # 重跑 captcha 队列（成功 → .archive）
 ```
 
-**采集策略（三级源）：** 默认 `ensan_only` — 爱企查 / 天眼查等走 ENScan L2。L1 官方工商：`escout collect 关键词 --dims registry --prefer-tier l1 -p gsxt`（需先在 [shiming.gsxt.gov.cn](https://shiming.gsxt.gov.cn) 个人登录并 `sync-gsxt-session` 导入 cookie）。ENScan 不可用时 L2 直接报错。
+**采集策略（三级源）：** 默认 `ensan_only` — 爱企查 / 天眼查等走 ENScan L2。L1 官方工商：`escout collect 关键词 --dims registry --prefer-tier l1 -p gsxt`（需先在 [shiming.gsxt.gov.cn](https://shiming.gsxt.gov.cn) 个人登录并 `sync-gsxt-session` 导入 cookie）。`routing.l1_fallback_to_l2: true` 时 L1 失败自动降级 ENScan（`degraded=true`）；L1/L2 字段不一致写入 `warehouse/conflicts/part.parquet`。ENScan 不可用时 L2 直接报错。
 
 默认 `fields`：`enterprise_info,partner,holds,invest,branch`（写入实体 + 股权边）。可用 `-f` / MCP `fields` 覆盖。
 

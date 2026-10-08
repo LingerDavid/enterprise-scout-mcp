@@ -8,6 +8,7 @@ from pathlib import Path
 
 from enterprise_scout_mcp.config import OutputConfig
 from enterprise_scout_mcp.models import CollectResult, ResultGrade
+from enterprise_scout_mcp.output.conflict_writer import append_conflicts
 from enterprise_scout_mcp.output.edge_writer import append_edges
 from enterprise_scout_mcp.output.parquet_writer import append_entity
 
@@ -44,6 +45,7 @@ class OutputRouter:
             "prefer_tier": result.task.prefer_tier.value if result.task.prefer_tier else "",
             "source_tier": result.source_tier.value if result.source_tier else "",
             "dimension": result.dimension.value if result.dimension else "",
+            "degraded": result.degraded,
             "depth": result.task.depth,
             "data": result.data,
         }
@@ -53,3 +55,8 @@ class OutputRouter:
             append_entity(result, wh)
             append_edges(result, wh)
         return path
+
+    def persist_conflicts(self, rows: list, _result: CollectResult) -> Path | None:
+        if not self._config.parquet_enabled:
+            return None
+        return append_conflicts(rows, Path(self._config.warehouse_dir))

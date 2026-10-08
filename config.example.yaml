@@ -21,6 +21,7 @@ routing:
   source_policy: ensan_only
   ensan_only: true
   gsxt_allow_unavailable: true
+  l1_fallback_to_l2: true   # L1 registry fail → ENScan L2 (degraded=true)
   min_success_rate_for_enscan: 0.0
   prefer_enscan_for: ["icp", "app", "wechat", "invest", "branch", "partner", "holds"]
   force_playwright_for: []
