@@ -15,6 +15,7 @@ from enterprise_scout_mcp.channels.official.parse import (
     parse_search_payload,
 )
 from enterprise_scout_mcp.config import GsxtConfig
+from enterprise_scout_mcp.integrations.gsxt_dom import nodriver_search_script
 from enterprise_scout_mcp.integrations.gsxt_transport import (
     browser_uses_cdp,
     build_browser_start_kwargs,
@@ -29,37 +30,6 @@ class BrowserSearchResult:
     cookies: dict[str, str] = field(default_factory=dict)
     message: str = ""
     html_snippet: str = ""
-
-
-_SEARCH_JS = """
-(() => {
-  const kw = %s;
-  const selectors = [
-    '#keyword', 'input[name="keyword"]', 'input[name="searchword"]',
-    'input[placeholder*="企业"]', 'input[placeholder*="关键字"]', 'input[type="search"]',
-  ];
-  let input = null;
-  for (const sel of selectors) {
-    input = document.querySelector(sel);
-    if (input) break;
-  }
-  if (!input) return {ok: false, error: 'search input not found'};
-  input.focus();
-  input.value = kw;
-  input.dispatchEvent(new Event('input', {bubbles: true}));
-  input.dispatchEvent(new Event('change', {bubbles: true}));
-  const btnSelectors = [
-    '.search_button', '.searchBtn', 'button.search', '#btn_query',
-    'a.search_button', 'span.search_button', '.btn-search', 'button[type="submit"]',
-  ];
-  for (const sel of btnSelectors) {
-    const btn = document.querySelector(sel);
-    if (btn) { btn.click(); return {ok: true, method: 'click', selector: sel}; }
-  }
-  input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', code: 'Enter', bubbles: true}));
-  return {ok: true, method: 'enter'};
-})()
-"""
 
 
 async def _set_cookies(browser: Any, cookies: dict[str, str]) -> None:
@@ -244,7 +214,7 @@ async def search_registry_async(
                 message="ok (in-browser api)",
             )
 
-        script = _SEARCH_JS % json.dumps(keyword, ensure_ascii=False)
+        script = nodriver_search_script(keyword)
         try:
             submit = await _eval_json(page, script)
         except Exception as exc:  # noqa: BLE001

@@ -15,6 +15,7 @@ from enterprise_scout_mcp.channels.official.parse import (
 )
 from enterprise_scout_mcp.config import GsxtConfig
 from enterprise_scout_mcp.integrations.gsxt_browser import BrowserSearchResult
+from enterprise_scout_mcp.integrations.gsxt_dom import submit_gsxt_dom_search_playwright
 from enterprise_scout_mcp.integrations.gsxt_transport import browser_uses_cdp, cdp_launch_hint
 
 
@@ -221,25 +222,7 @@ async def search_registry_playwright_async(
                 message="ok (playwright cdp api)",
             )
 
-        # DOM search fallback
-        submit_js = """
-        ({ kw }) => {
-          const selectors = ['#keyword','input[name="keyword"]','input[name="searchword"]','input[type="search"]'];
-          let input = null;
-          for (const sel of selectors) { input = document.querySelector(sel); if (input) break; }
-          if (!input) return { ok: false, error: 'search input not found' };
-          input.focus(); input.value = kw;
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          const btns = ['.search_button','.searchBtn','button.search','#btn_query'];
-          for (const sel of btns) {
-            const btn = document.querySelector(sel);
-            if (btn) { btn.click(); return { ok: true }; }
-          }
-          input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-          return { ok: true };
-        }
-        """
-        submit = await page.evaluate(submit_js, keyword)
+        submit = await submit_gsxt_dom_search_playwright(page, keyword)
         if isinstance(submit, dict) and not submit.get("ok"):
             return BrowserSearchResult(
                 ok=False,

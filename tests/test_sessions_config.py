@@ -34,6 +34,10 @@ def test_list_sessions_reports_gsxt(tmp_path: Path, monkeypatch):
         encoding="utf-8",
     )
     monkeypatch.chdir(root)
+    monkeypatch.setattr(
+        "enterprise_scout_mcp.sessions.registry.resolve_project_root",
+        lambda _path=None: root,
+    )
     cfg = AppConfig(
         sessions=SessionsConfig(dir="./.state", gsxt="gsxt_personal_session.json")
     )
@@ -47,6 +51,10 @@ def test_import_gsxt_browser_array(tmp_path: Path, monkeypatch):
     root = tmp_path / "proj"
     root.mkdir()
     monkeypatch.chdir(root)
+    monkeypatch.setattr(
+        "enterprise_scout_mcp.sessions.registry.resolve_project_root",
+        lambda _path=None: root,
+    )
     export = root / "export.json"
     export.write_text(
         json.dumps([{"name": "SECTOKEN", "value": "999"}]),

@@ -156,7 +156,14 @@ def classify_browser_block(html: str) -> str | None:
     lower = html.lower()
     if "nwaf" in lower or "waf页面" in html:
         return "blocked"
-    if "environment checking" in lower or "ctct_bundle" in lower:
+    if "environment checking" in lower:
+        return "ct_challenge"
+    # ctct_bundle is embedded on normal GSXT pages — only block when search chrome is absent
+    if "ctct_bundle" in lower and (
+        "keyword" not in lower
+        and "searchword" not in lower
+        and "国家企业信用信息公示系统" not in html
+    ):
         return "ct_challenge"
     if "document.cookie" in html and "location.href" in html:
         return "jsl_challenge"
@@ -168,7 +175,12 @@ def classify_browser_block(html: str) -> str | None:
     )
     if login_wall:
         return "auth_expired"
-    if "geetest" in lower or "验证码" in html:
+    has_search_chrome = (
+        "keyword" in lower
+        or "searchword" in lower
+        or "国家企业信用信息公示系统" in html
+    )
+    if not has_search_chrome and ("geetest" in lower or "验证码" in html):
         return "captcha"
     if "IP请求异常" in html or "可疑的攻击" in html:
         return "blocked"
