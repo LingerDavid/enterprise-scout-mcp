@@ -10,6 +10,7 @@ from enterprise_scout_mcp.defaults import DEFAULT_REGISTRY_FIELDS
 
 
 class Platform(str, Enum):
+    GSXT = "gsxt"
     AIQICHA = "aiqicha"
     TIANYANCHA = "tianyancha"
     KUAICHA = "kuaicha"
@@ -18,9 +19,25 @@ class Platform(str, Enum):
 
 
 class ChannelKind(str, Enum):
+    GSXT_OFFICIAL = "gsxt_official"
     ENSCAN_GO = "enscan_go"
     PLAYWRIGHT = "playwright"
     HANDAAS_API = "handaas_api"
+
+
+class SourceTier(str, Enum):
+    L1 = "l1"
+    L2 = "l2"
+    L3 = "l3"
+
+
+class Dimension(str, Enum):
+    REGISTRY = "registry"
+    EQUITY = "equity"
+    CREDIT = "credit"
+    JUDICIAL = "judicial"
+    IP = "ip"
+    DIGITAL = "digital"
 
 
 class ResultGrade(str, Enum):
@@ -28,6 +45,7 @@ class ResultGrade(str, Enum):
     PARTIAL = "partial"
     CAPTCHA = "captcha"
     BLOCKED = "blocked"
+    AUTH_EXPIRED = "auth_expired"
     ERROR = "error"
 
 
@@ -36,8 +54,18 @@ class CollectTask:
     keyword: str
     platform: Platform
     fields: tuple[str, ...] = DEFAULT_REGISTRY_FIELDS
+    dimensions: tuple[Dimension, ...] = (Dimension.REGISTRY,)
+    prefer_tier: SourceTier | None = None
     depth: int = 1
     force_channel: ChannelKind | None = None
+
+    @property
+    def primary_dimension(self) -> Dimension:
+        return self.dimensions[0] if self.dimensions else Dimension.REGISTRY
+
+    @property
+    def tiered_collect(self) -> bool:
+        return self.platform == Platform.GSXT or self.prefer_tier is not None
 
 
 @dataclass
@@ -82,3 +110,6 @@ class CollectResult:
     data: dict[str, Any] = field(default_factory=dict)
     message: str = ""
     persona_id: str = ""
+    source_tier: SourceTier | None = None
+    dimension: Dimension | None = None
+    degraded: bool = False

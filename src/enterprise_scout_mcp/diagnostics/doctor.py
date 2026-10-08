@@ -6,7 +6,7 @@ from pathlib import Path
 
 from enterprise_scout_mcp.config import AppConfig, resolve_project_root
 from enterprise_scout_mcp.diagnostics.sidecars import build_sidecar_report
-from enterprise_scout_mcp.models import ChannelKind
+from enterprise_scout_mcp.models import ChannelKind, Dimension
 from enterprise_scout_mcp.scheduler import CollectorScheduler
 
 
@@ -29,14 +29,46 @@ def build_doctor_report(
 ) -> dict:
     root = resolve_project_root()
     pw = config.integrations.playwright
+    gsxt = config.integrations.gsxt
     wh = Path(config.output.warehouse_dir)
     entities = wh / "entities" / "part.parquet"
     edges = wh / "edges" / "equity" / "part.parquet"
+    session_path = _resolve(root, gsxt.session_file)
+    gsxt_channel = scheduler._channels[ChannelKind.GSXT_OFFICIAL]
 
     report: dict = {
         "project_root": str(root),
         "routing": {
+            "source_policy": config.routing.source_policy,
             "ensan_only": config.routing.ensan_only,
+        },
+        "tiers": {
+            "l1_registry": {
+                "dimension": Dimension.REGISTRY.value,
+                "channel": ChannelKind.GSXT_OFFICIAL.value,
+                "implemented": True,
+                "available": gsxt_channel.available(),
+                "session_mode": gsxt.session_mode,
+                "session_file": str(session_path),
+                "session_exists": session_path.is_file(),
+                "shiming_url": gsxt.shiming_url,
+            },
+            "l2_registry": {
+                "dimension": Dimension.REGISTRY.value,
+                "channel": ChannelKind.ENSCAN_GO.value,
+                "implemented": True,
+                "available": scheduler._channels[ChannelKind.ENSCAN_GO].available(),
+            },
+            "l3": {"implemented": False, "note": "academic ingest stub"},
+            "equity": {"implemented": False},
+            "credit": {"implemented": False},
+            "judicial": {"implemented": False},
+        },
+        "gsxt": {
+            "enabled": gsxt.enabled,
+            "base_url": gsxt.base_url,
+            "search_url": gsxt.search_url,
+            "available": gsxt_channel.available(),
         },
         "ensan_go": {
             "available": scheduler._channels[ChannelKind.ENSCAN_GO].available(),

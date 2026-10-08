@@ -78,11 +78,14 @@ escout register-hermes          # 写入 ~/.hermes/config.yaml
 escout doctor --probe           # 含 ENScan / proxy_pool 探活
 escout smoke-sidecars           # 仅 sidecar 探活（CI/脚本用）
 escout smoke-collect 小米       # 实机采集冒烟（需 ENScan 运行）
+escout sync-gsxt-session --from-file cookies.json   # L1 个人登录 cookie
+escout collect 苏州挚途 --dims registry --prefer-tier l1 -p gsxt
+escout smoke-registry-l1 苏州挚途                  # L1 registry 穿通验收
 escout drain-retry --dry-run    # 列出 retry_queue 待重跑任务
 escout drain-retry --limit 20   # 重跑 captcha 队列（成功 → .archive）
 ```
 
-**采集策略：只走 ENScan。** `routing.ensan_only: true`（默认）时，爱企查 / 天眼查 / 快查 / 风鸟一律经 ENScan_GO `:31000`，不做 Playwright/httpx/nodriver 页面直采回退。ENScan 不可用时直接报错。天眼查：`escout collect 关键词 -p tianyancha`（需在 ENScan `config.yaml` 配置 TYC cookie）。
+**采集策略（三级源）：** 默认 `ensan_only` — 爱企查 / 天眼查等走 ENScan L2。L1 官方工商：`escout collect 关键词 --dims registry --prefer-tier l1 -p gsxt`（需先在 [shiming.gsxt.gov.cn](https://shiming.gsxt.gov.cn) 个人登录并 `sync-gsxt-session` 导入 cookie）。ENScan 不可用时 L2 直接报错。
 
 默认 `fields`：`enterprise_info,partner,holds,invest,branch`（写入实体 + 股权边）。可用 `-f` / MCP `fields` 覆盖。
 
@@ -107,12 +110,11 @@ escout drain-retry --limit 20   # 重跑 captcha 队列（成功 → .archive）
 ```
 MCP (enterprise-scout-mcp)
   └─ CollectorScheduler
-       ├─ PersonaEngine
-       ├─ RiskAwareRouter     ← ensan_only: registry → ENScan only
-       ├─ BehaviorOrchestrator
-       ├─ EnvironmentValidator
-       ├─ EnsanGoChannel      ← ENScan_GO :31000 (primary)
-       └─ HandaasChannel      ← optional paid API (not scrape fallback)
+       ├─ TierAwareRouter     ← L1 GSXT / L2 ENScan (when --prefer-tier)
+       ├─ RiskAwareRouter     ← ensan_only default for aiqicha/tyc
+       ├─ GsxtOfficialChannel ← L1 registry (personal session)
+       ├─ EnsanGoChannel      ← L2 ENScan :31000
+       └─ HandaasChannel      ← optional paid API
 ```
 
 ## Sidecar

@@ -16,6 +16,9 @@ def test_doctor_report_keys() -> None:
         scheduler.close()
 
     assert "ensan_go" in report
+    assert "gsxt" in report
+    assert "tiers" in report
+    assert report["tiers"]["l1_registry"]["implemented"] is True
     assert "routing" in report
     assert report["routing"]["ensan_only"] is True
     assert "nodriver" in report

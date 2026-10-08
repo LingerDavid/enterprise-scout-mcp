@@ -40,6 +40,10 @@ class OutputRouter:
             "persona_id": result.persona_id,
             "message": result.message,
             "fields": list(result.task.fields),
+            "dimensions": [d.value for d in result.task.dimensions],
+            "prefer_tier": result.task.prefer_tier.value if result.task.prefer_tier else "",
+            "source_tier": result.source_tier.value if result.source_tier else "",
+            "dimension": result.dimension.value if result.dimension else "",
             "depth": result.task.depth,
             "data": result.data,
         }

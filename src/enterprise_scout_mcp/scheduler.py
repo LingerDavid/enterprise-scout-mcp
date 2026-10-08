@@ -9,6 +9,7 @@ from enterprise_scout_mcp.captcha.handler import CaptchaHandler, CaptchaStrategy
 from enterprise_scout_mcp.channels.base import CollectionChannel
 from enterprise_scout_mcp.channels.ensan_go import EnsanGoChannel
 from enterprise_scout_mcp.channels.handaas_api import HandaasChannel
+from enterprise_scout_mcp.channels.official.gsxt import GsxtOfficialChannel
 from enterprise_scout_mcp.channels.playwright_aiqicha import PlaywrightAiqichaChannel
 from enterprise_scout_mcp.config import AppConfig, resolve_project_root
 from enterprise_scout_mcp.consistency.validator import EnvironmentValidator
@@ -21,6 +22,7 @@ from enterprise_scout_mcp.models import (
 from enterprise_scout_mcp.output.router import OutputRouter
 from enterprise_scout_mcp.persona.engine import PersonaEngine
 from enterprise_scout_mcp.routing.risk_router import RiskAwareRouter
+from enterprise_scout_mcp.routing.tier_router import TierAwareRouter
 from enterprise_scout_mcp.state.store import StateStore
 from enterprise_scout_mcp.transport.curl_cffi_backend import CurlCffiTransport
 from enterprise_scout_mcp.transport.egress import EgressContext
@@ -34,10 +36,12 @@ class CollectorScheduler:
         state_dir = Path(config.state_dir)
         if not state_dir.is_absolute():
             state_dir = root / state_dir
+        self._state_dir = state_dir
         self._store = StateStore(state_dir) if config.state_persist else None
 
         self._persona = PersonaEngine(config.personas.dir)
         self._router = RiskAwareRouter(config.routing, store=self._store)
+        self._tier_router = TierAwareRouter(config.routing)
         self._behavior = BehaviorOrchestrator(config.behavior, store=self._store)
         self._consistency = EnvironmentValidator()
         self._output = OutputRouter(config.output)
@@ -48,6 +52,10 @@ class CollectorScheduler:
         )
 
         self._channels: dict[ChannelKind, CollectionChannel] = {
+            ChannelKind.GSXT_OFFICIAL: GsxtOfficialChannel(
+                config.integrations.gsxt,
+                state_dir=state_dir,
+            ),
             ChannelKind.ENSCAN_GO: EnsanGoChannel(config.integrations.ensan_go),
             ChannelKind.PLAYWRIGHT: PlaywrightAiqichaChannel(
                 config.integrations.playwright,
@@ -85,6 +93,26 @@ class CollectorScheduler:
             accept_language=headers.get("Accept-Language") or persona.locale or None,
         )
 
+    def _use_tier_router(self, task: CollectTask) -> bool:
+        if task.tiered_collect:
+            return True
+        return self._config.routing.source_policy == "tiered"
+
+    def _select_channel(self, task: CollectTask) -> ChannelKind:
+        if self._use_tier_router(task):
+            decision = self._tier_router.select(
+                task,
+                gsxt_available=self._channels[ChannelKind.GSXT_OFFICIAL].available(),
+                ensan_available=self._channels[ChannelKind.ENSCAN_GO].available(),
+            )
+            return decision.channel
+        return self._router.select_channel(
+            task,
+            ensan_available=self._channels[ChannelKind.ENSCAN_GO].available(),
+            playwright_available=self._channels[ChannelKind.PLAYWRIGHT].available(),
+            handaas_available=self._channels[ChannelKind.HANDAAS_API].available(),
+        )
+
     def run(
         self,
         task: CollectTask,
@@ -106,12 +134,7 @@ class CollectorScheduler:
             )
 
         try:
-            channel_kind = self._router.select_channel(
-                task,
-                ensan_available=self._channels[ChannelKind.ENSCAN_GO].available(),
-                playwright_available=self._channels[ChannelKind.PLAYWRIGHT].available(),
-                handaas_available=self._channels[ChannelKind.HANDAAS_API].available(),
-            )
+            channel_kind = self._select_channel(task)
         except RuntimeError as exc:
             return CollectResult(
                 task=task,
@@ -156,7 +179,7 @@ class CollectorScheduler:
 
         if result.grade in (ResultGrade.OK, ResultGrade.PARTIAL):
             self._behavior.on_success(pid)
-        elif result.grade == ResultGrade.CAPTCHA:
+        elif result.grade in (ResultGrade.CAPTCHA, ResultGrade.AUTH_EXPIRED):
             self._behavior.on_captcha(pid)
             action = self._captcha.handle(result, bad_proxy=proxy_url)
             if action.retry:

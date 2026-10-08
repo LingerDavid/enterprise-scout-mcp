@@ -1,4 +1,4 @@
-"""Shared defaults for ENScan-only registry collect."""
+"""Shared defaults for registry / tiered collect."""
 
 from __future__ import annotations
 

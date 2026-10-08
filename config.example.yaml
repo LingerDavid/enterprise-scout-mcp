@@ -17,13 +17,25 @@ behavior:
   cooldown_after_block_seconds: 1800
 
 routing:
-  # All registry platforms (aiqicha / tianyancha / …) go through ENScan only.
+  # ensan_only: L2 ENScan for aiqicha/tyc/… ; use --prefer-tier l1 -p gsxt for L1 official
+  source_policy: ensan_only
   ensan_only: true
+  gsxt_allow_unavailable: true
   min_success_rate_for_enscan: 0.0
   prefer_enscan_for: ["icp", "app", "wechat", "invest", "branch", "partner", "holds"]
   force_playwright_for: []
 
 integrations:
+  # L1 GSXT — personal login session (shiming.gsxt.gov.cn → export cookies)
+  gsxt:
+    enabled: true
+    base_url: "https://www.gsxt.gov.cn"
+    shiming_url: "https://shiming.gsxt.gov.cn"
+    session_mode: personal
+    session_file: "./.state/gsxt_personal_session.json"
+    search_url: "https://www.gsxt.gov.cn/api/search/testAi"
+    captcha_mode: manual
+
   # ENScan_GO — sibling checkout: e:/Project/ENScan_GO (required when ensan_only)
   ensan_go:
     enabled: true
@@ -70,6 +82,7 @@ output:
     ok: "warehouse"
     partial: "raw"
     captcha: "retry_queue"
+    auth_expired: "retry_queue"
     blocked: "dead_letter"
 
 # Neo4j — matches EnterpriseLake docker-compose defaults

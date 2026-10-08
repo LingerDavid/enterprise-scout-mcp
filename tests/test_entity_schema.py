@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from enterprise_scout_mcp.models import ChannelKind, CollectResult, CollectTask, Platform, ResultGrade
+from enterprise_scout_mcp.models import (
+    ChannelKind,
+    CollectResult,
+    CollectTask,
+    Platform,
+    ResultGrade,
+    SourceTier,
+)
 from enterprise_scout_mcp.output.entity_schema import entity_row
 
 
@@ -43,3 +50,22 @@ def test_entity_row_unwraps_enscan_enterprise_info() -> None:
     assert row["entity_id"] == "xyz123"
     assert row["name"] == "苏州挚途科技有限公司"
     assert "partner" in row["payload_json"]
+
+
+def test_entity_row_gsxt_credit_code():
+    task = CollectTask(keyword="苏州挚途", platform=Platform.GSXT)
+    result = CollectResult(
+        task=task,
+        channel=ChannelKind.GSXT_OFFICIAL,
+        grade=ResultGrade.OK,
+        data={
+            "enterprise_info": [
+                {"name": "苏州挚途科技有限公司", "credit_code": "91320594MA1XXXXXX"},
+            ],
+        },
+        source_tier=SourceTier.L1,
+    )
+    row = entity_row(result)
+    assert row["credit_code"] == "91320594MA1XXXXXX"
+    assert row["entity_id"] == "91320594MA1XXXXXX"
+    assert row["source_tier"] == "l1"

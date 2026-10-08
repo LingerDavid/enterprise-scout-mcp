@@ -48,7 +48,24 @@ class CurlCffiConfig(BaseModel):
     impersonate: str = "chrome131"
 
 
+class GsxtConfig(BaseModel):
+    enabled: bool = True
+    base_url: str = "https://www.gsxt.gov.cn"
+    shiming_url: str = "https://shiming.gsxt.gov.cn"
+    session_mode: str = "personal"  # personal | anonymous
+    session_file: str = "./.state/gsxt_personal_session.json"
+    search_url: str = "https://www.gsxt.gov.cn/api/search/testAi"
+    search_keyword_field: str = "searchword"
+    captcha_mode: str = "manual"
+    user_agent: str = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    )
+    timeout_seconds: float = 30.0
+
+
 class IntegrationsConfig(BaseModel):
+    gsxt: GsxtConfig = Field(default_factory=GsxtConfig)
     ensan_go: EnsanGoConfig = Field(default_factory=EnsanGoConfig)
     proxy_pool: ProxyPoolConfig = Field(default_factory=ProxyPoolConfig)
     handaas: HandaasConfig = Field(default_factory=HandaasConfig)
@@ -71,8 +88,10 @@ class BehaviorConfig(BaseModel):
 
 
 class RoutingConfig(BaseModel):
-    # Registry platforms (aiqicha/tianyancha/…) always use ENScan; no interactive scrape fallback.
+    # ensan_only: L2 commercial path for aiqicha/tyc/… ; tiered: L1 GSXT when --prefer-tier l1 / -p gsxt
+    source_policy: str = "ensan_only"  # ensan_only | tiered
     ensan_only: bool = True
+    gsxt_allow_unavailable: bool = True  # route to GSXT even without session (returns auth_expired)
     min_success_rate_for_enscan: float = 0.0
     prefer_enscan_for: list[str] = Field(
         default_factory=lambda: ["icp", "app", "wechat", "invest", "branch", "partner", "holds"]
@@ -90,6 +109,7 @@ class OutputConfig(BaseModel):
             "ok": "warehouse",
             "partial": "raw",
             "captcha": "retry_queue",
+            "auth_expired": "retry_queue",
             "blocked": "dead_letter",
         }
     )

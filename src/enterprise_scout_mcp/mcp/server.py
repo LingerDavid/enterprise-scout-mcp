@@ -12,7 +12,8 @@ from enterprise_scout_mcp.defaults import DEFAULT_REGISTRY_FIELDS
 from enterprise_scout_mcp.diagnostics.doctor import build_doctor_report
 from enterprise_scout_mcp.diagnostics.sidecars import build_sidecar_report
 from enterprise_scout_mcp.integrations.enscan_cookies import sync_aiqicha_to_enscan
-from enterprise_scout_mcp.models import CollectTask, Platform
+from enterprise_scout_mcp.integrations.gsxt_session import import_session_file
+from enterprise_scout_mcp.models import CollectTask, Dimension, Platform, SourceTier
 from enterprise_scout_mcp.scheduler import CollectorScheduler
 from enterprise_scout_mcp.retry import drain_retry_queue
 from enterprise_scout_mcp.warehouse.neo4j_loader import import_warehouse
@@ -31,12 +32,16 @@ def create_mcp_server():
     mcp = FastMCP(
         "enterprise-scout-mcp",
         instructions=(
-            "Enterprise registry intelligence via ENScan_GO (ensan_only). "
-            "Optional Handaas API for paid complement. "
-            "Writes entities/edges to EnterpriseLake. "
-            "Default fields include partner/holds/invest/branch for equity edges."
+            "Enterprise registry intelligence: L1 GSXT official (--prefer-tier l1) "
+            "or L2 ENScan (ensan_only default). "
+            "Writes entities/edges to EnterpriseLake."
         ),
     )
+
+    def _parse_dims(text: str) -> tuple[Dimension, ...]:
+        if not text.strip():
+            return (Dimension.REGISTRY,)
+        return tuple(Dimension(p.strip()) for p in text.split(",") if p.strip())
 
     @mcp.tool()
     def enterprise_collect(
@@ -44,23 +49,32 @@ def create_mcp_server():
         platform: str = "aiqicha",
         depth: int = 1,
         fields: str = "",
+        dims: str = "registry",
+        prefer_tier: str = "",
         persona_id: str = "",
     ) -> str:
-        """Collect enterprise info (default fields: enterprise_info,partner,holds,invest,branch)."""
+        """Collect enterprise info. L1: prefer_tier=l1 + platform gsxt (needs GSXT session)."""
         config = load_config()
         scheduler = CollectorScheduler(config)
         try:
+            tier = SourceTier(prefer_tier.lower()) if prefer_tier else None
+            plat = platform
+            if tier == SourceTier.L1 and plat == "aiqicha":
+                plat = "gsxt"
             task = CollectTask(
                 keyword=keyword,
-                platform=Platform(platform),
+                platform=Platform(plat),
                 depth=depth,
                 fields=_parse_fields(fields),
+                dimensions=_parse_dims(dims),
+                prefer_tier=tier,
             )
             result = scheduler.run(task, persona_id=persona_id or None)
             return json.dumps(
                 {
                     "grade": result.grade.value,
                     "channel": result.channel.value,
+                    "source_tier": result.source_tier.value if result.source_tier else "",
                     "message": result.message,
                     "persona_id": result.persona_id,
                     "data": result.data,
@@ -104,6 +118,19 @@ def create_mcp_server():
         return enterprise_collect(
             keyword=keyword, platform=platform, depth=0, fields=fields
         )
+
+    @mcp.tool()
+    def sync_gsxt_session(cookie_file: str) -> str:
+        """Import GSXT personal-login cookies after browser login at shiming.gsxt.gov.cn."""
+        config = load_config()
+        src = Path(cookie_file)
+        dest = Path(config.integrations.gsxt.session_file)
+        if not dest.is_absolute():
+            from enterprise_scout_mcp.config import resolve_project_root
+
+            dest = resolve_project_root() / dest
+        preview = import_session_file(src, dest)
+        return json.dumps({"ok": True, "session_file": str(dest), "cookie_preview": preview})
 
     @mcp.tool()
     def sync_enscan_cookies(cookie_file: str = "") -> str:

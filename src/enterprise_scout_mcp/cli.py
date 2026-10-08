@@ -13,9 +13,27 @@ from enterprise_scout_mcp.config import load_config
 from enterprise_scout_mcp.diagnostics.doctor import build_doctor_report
 from enterprise_scout_mcp.diagnostics.sidecars import build_sidecar_report
 from enterprise_scout_mcp.integrations.enscan_cookies import sync_aiqicha_to_enscan
-from enterprise_scout_mcp.models import CollectTask, Platform
+from enterprise_scout_mcp.integrations.gsxt_session import import_session_file
+from enterprise_scout_mcp.models import CollectTask, Dimension, Platform, SourceTier
 from enterprise_scout_mcp.persona.engine import PersonaEngine
 from enterprise_scout_mcp.scheduler import CollectorScheduler
+
+
+def _parse_dimensions(text: str) -> tuple[Dimension, ...]:
+    if not text or not text.strip():
+        return (Dimension.REGISTRY,)
+    out: list[Dimension] = []
+    for part in text.split(","):
+        part = part.strip()
+        if part:
+            out.append(Dimension(part))
+    return tuple(out) if out else (Dimension.REGISTRY,)
+
+
+def _parse_prefer_tier(name: str | None) -> SourceTier | None:
+    if not name:
+        return None
+    return SourceTier(name.lower())
 
 
 def _platform(name: str) -> Platform:
@@ -37,10 +55,17 @@ def cmd_collect(args: argparse.Namespace) -> int:
             if args.fields
             else DEFAULT_REGISTRY_FIELDS
         )
+        prefer_tier = _parse_prefer_tier(getattr(args, "prefer_tier", None))
+        platform_name = args.platform
+        if prefer_tier == SourceTier.L1 and platform_name == "aiqicha":
+            platform_name = "gsxt"
+        dims = _parse_dimensions(getattr(args, "dims", "") or "")
         task = CollectTask(
             keyword=args.keyword,
-            platform=_platform(args.platform),
+            platform=_platform(platform_name),
             fields=fields,
+            dimensions=dims,
+            prefer_tier=prefer_tier,
             depth=args.depth,
         )
         result = scheduler.run(task, persona_id=args.persona)
@@ -49,6 +74,8 @@ def cmd_collect(args: argparse.Namespace) -> int:
                 {
                     "grade": result.grade.value,
                     "channel": result.channel.value,
+                    "source_tier": result.source_tier.value if result.source_tier else "",
+                    "dimension": result.dimension.value if result.dimension else "",
                     "message": result.message,
                     "persona_id": result.persona_id,
                     "data_keys": list(result.data.keys()),
@@ -189,6 +216,66 @@ def cmd_sync_cookies(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_sync_gsxt_session(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    root = Path(config.state_dir)
+    if not root.is_absolute():
+        from enterprise_scout_mcp.config import resolve_project_root
+
+        root = resolve_project_root(args.config) / root
+    src = Path(args.from_file)
+    dest = Path(args.session_file or config.integrations.gsxt.session_file)
+    if not dest.is_absolute():
+        from enterprise_scout_mcp.config import resolve_project_root
+
+        dest = resolve_project_root(args.config) / dest
+    preview = import_session_file(src, dest)
+    print(
+        json.dumps(
+            {
+                "ok": True,
+                "session_file": str(dest),
+                "mode": args.mode,
+                "cookie_preview": preview,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 0
+
+
+def cmd_smoke_registry_l1(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    scheduler = CollectorScheduler(config)
+    try:
+        task = CollectTask(
+            keyword=args.keyword,
+            platform=Platform.GSXT,
+            dimensions=(Dimension.REGISTRY,),
+            prefer_tier=SourceTier.L1,
+            fields=("enterprise_info",),
+            depth=0,
+        )
+        result = scheduler.run(task, persona_id=args.persona)
+        print(
+            json.dumps(
+                {
+                    "grade": result.grade.value,
+                    "channel": result.channel.value,
+                    "source_tier": result.source_tier.value if result.source_tier else "",
+                    "message": result.message,
+                    "data": result.data,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0 if result.grade.value in ("ok", "partial") else 1
+    finally:
+        scheduler.close()
+
+
 def cmd_drain_retry(args: argparse.Namespace) -> int:
     from enterprise_scout_mcp.retry import drain_retry_queue
 
@@ -217,6 +304,13 @@ def build_parser() -> argparse.ArgumentParser:
     collect.add_argument("keyword", help="Company name or keyword")
     collect.add_argument("-p", "--platform", default="aiqicha", type=str)
     collect.add_argument("-f", "--fields", default="", help="Comma-separated ENScan fields")
+    collect.add_argument("--dims", default="", help="Dimensions: registry (L1 spike)")
+    collect.add_argument(
+        "--prefer-tier",
+        default=None,
+        choices=["l1", "l2", "l3"],
+        help="Source tier: l1=GSXT official, l2=ENScan",
+    )
     collect.add_argument("--depth", type=int, default=1)
     collect.add_argument("--persona", default=None)
     collect.set_defaults(func=cmd_collect)
@@ -269,6 +363,23 @@ def build_parser() -> argparse.ArgumentParser:
     sync.add_argument("--from-file", default=None, help="Cookie file (default: playwright.cookie_file)")
     sync.add_argument("--enscan-config", default=None, help="ENScan config path")
     sync.set_defaults(func=cmd_sync_cookies)
+
+    gsxt_sess = sub.add_parser(
+        "sync-gsxt-session",
+        help="Import GSXT personal-login cookies (export from browser after shiming login)",
+    )
+    gsxt_sess.add_argument("--from-file", required=True, help="JSON cookie export")
+    gsxt_sess.add_argument("--session-file", default=None, help="Override session path")
+    gsxt_sess.add_argument("--mode", default="personal", choices=["personal"])
+    gsxt_sess.set_defaults(func=cmd_sync_gsxt_session)
+
+    smoke_l1 = sub.add_parser(
+        "smoke-registry-l1",
+        help="Live L1 GSXT registry spike (needs sync-gsxt-session)",
+    )
+    smoke_l1.add_argument("keyword", nargs="?", default="苏州挚途")
+    smoke_l1.add_argument("--persona", default=None)
+    smoke_l1.set_defaults(func=cmd_smoke_registry_l1)
 
     drain = sub.add_parser("drain-retry", help="Re-run jobs from raw/retry_queue")
     drain.add_argument("--limit", type=int, default=0, help="Max jobs (0 = all)")

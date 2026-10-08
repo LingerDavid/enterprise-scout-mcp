@@ -6,14 +6,17 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-from enterprise_scout_mcp.models import CollectResult
+from enterprise_scout_mcp.models import CollectResult, Dimension, SourceTier
 
 ENTITY_COLUMNS = (
     "entity_id",
+    "credit_code",
     "name",
     "former_name",
     "platform",
     "source_channel",
+    "source_tier",
+    "dimension",
     "query_keyword",
     "grade",
     "persona_id",
@@ -22,7 +25,7 @@ ENTITY_COLUMNS = (
     "message",
 )
 
-# ENScan ENSMapLN + legacy / Playwright keys.
+# ENScan ENSMapLN + GSXT / legacy keys.
 _NAME_KEYS = (
     "company_name",
     "name",
@@ -35,6 +38,14 @@ _ID_KEYS = (
     "nameId",
     "pid",
     "PID",
+)
+_CREDIT_KEYS = (
+    "credit_code",
+    "uniscId",
+    "reg_code",
+    "统一社会信用代码",
+    "socialCreditCode",
+    "taxNo",
 )
 _FORMER_KEYS = ("former_name", "曾用名")
 
@@ -65,14 +76,22 @@ def entity_row(result: CollectResult) -> dict[str, Any]:
 
     name = _pick(sources, _NAME_KEYS) or result.task.keyword
     former = _pick(sources, _FORMER_KEYS)
-    entity_id = _pick(sources, _ID_KEYS)
+    credit_code = _pick(sources, _CREDIT_KEYS)
+    entity_id = credit_code or _pick(sources, _ID_KEYS)
+    tier = result.source_tier.value if result.source_tier else ""
+    if not tier and isinstance(data.get("source_tier"), str):
+        tier = data["source_tier"]
+    dim = result.dimension.value if result.dimension else Dimension.REGISTRY.value
 
     return {
         "entity_id": entity_id,
+        "credit_code": credit_code,
         "name": name,
         "former_name": former,
         "platform": result.task.platform.value,
         "source_channel": result.channel.value,
+        "source_tier": tier,
+        "dimension": dim,
         "query_keyword": result.task.keyword,
         "grade": result.grade.value,
         "persona_id": result.persona_id,
