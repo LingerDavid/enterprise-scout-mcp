@@ -158,22 +158,25 @@ async def search_registry_playwright_async(
         await asyncio.sleep(2.0)
         ready_wait = min(max(config.browser_search_timeout * 0.5, 15.0), 40.0)
         block = await _wait_page_ready(page, ready_wait)
-        ruishu_wait = min(max(config.browser_search_timeout * 0.4, 10.0), 30.0)
-        if not await wait_ruishu_ready(page, config, ruishu_wait):
-            return BrowserSearchResult(
-                ok=False,
-                message=(
-                    "瑞数环境未就绪 — 在 CDP Chrome 中手动打开 gsxt.gov.cn 并完成验证后再试 "
-                    "(勿对 521/412 换 IP 重试)"
-                ),
-                cookies=await _context_cookies(page),
-            )
         if block == "ct_challenge":
             return BrowserSearchResult(
                 ok=False,
                 message="CT/瑞数 did not clear in attached Chrome — complete verification manually in that window",
                 cookies=await _context_cookies(page),
             )
+        # Index HTML may be ready while in-page fetch still hits JSL 521 — prefer Method A
+        # (DOM→XHR) over hard-failing the fetch probe. Only probe when DOM looks incomplete.
+        if block is not None:
+            ruishu_wait = min(max(config.browser_search_timeout * 0.4, 10.0), 30.0)
+            if not await wait_ruishu_ready(page, config, ruishu_wait):
+                return BrowserSearchResult(
+                    ok=False,
+                    message=(
+                        "瑞数环境未就绪 — 在 CDP Chrome 中手动打开 gsxt.gov.cn 并完成验证后再试 "
+                        "(勿对 521/412 换 IP 重试)"
+                    ),
+                    cookies=await _context_cookies(page),
+                )
         if block == "blocked":
             return BrowserSearchResult(
                 ok=False,
