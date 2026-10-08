@@ -8,7 +8,7 @@ from typing import Any
 
 from enterprise_scout_mcp.config import AppConfig, resolve_project_root
 from enterprise_scout_mcp.integrations.enscan_cookies import load_yaml, sync_aiqicha_to_enscan
-from enterprise_scout_mcp.integrations.gsxt_session import import_session_file, load_session
+from enterprise_scout_mcp.integrations.gsxt_session import import_session_file, load_session, save_session
 
 
 @dataclass(frozen=True)
@@ -162,9 +162,48 @@ def import_session(
     raise ValueError(f"import not supported for {name!r}")
 
 
-def warmup_gsxt_session(config: AppConfig) -> dict[str, Any]:
+def gsxt_cdp_hint(config: AppConfig) -> dict[str, Any]:
+    """Print how to launch real Chrome for Playwright connect_over_cdp (Ruishu-safe)."""
+    from enterprise_scout_mcp.integrations.gsxt_transport import resolve_browser_backend
+
+    root = resolve_project_root()
+    gsxt = config.integrations.gsxt
+    data_dir = Path(gsxt.browser_user_data_dir)
+    if not data_dir.is_absolute():
+        data_dir = root / data_dir
+    port = int(gsxt.browser_cdp_port or 9222)
+    host = (gsxt.browser_cdp_host or "127.0.0.1").strip() or "127.0.0.1"
+    chrome_paths = [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    ]
+    launch = (
+        f'chrome.exe --remote-debugging-port={port} '
+        f'--user-data-dir="{data_dir}" '
+        f"(Playwright connect_over_cdp -> http://{host}:{port})"
+    )
+    return {
+        "backend": resolve_browser_backend(gsxt),
+        "browser_cdp_host": host,
+        "browser_cdp_port": port,
+        "user_data_dir": str(data_dir),
+        "launch_command": launch,
+        "windows_chrome_paths": chrome_paths,
+        "steps": [
+            "Close all Chrome windows using the same profile.",
+            f"Launch Chrome with --remote-debugging-port={port} and --user-data-dir (see launch_command).",
+            "Open https://www.gsxt.gov.cn/index.html and complete Ruishu/NWAF checks manually.",
+            "Optional: login at shiming.gsxt.gov.cn, then escout sessions import gsxt --from-file cookies.json",
+            f"Set integrations.gsxt.browser_cdp_port: {port} in config.yaml",
+            "Run: escout smoke-registry-l1 苏州挚途",
+        ],
+    }
+
+
+def warmup_gsxt_session(config: AppConfig, *, probe_keyword: str = "苏州挚途") -> dict[str, Any]:
+    """Warm profile via real browser search (preferred) — also refreshes cookies."""
+    from enterprise_scout_mcp.integrations.gsxt_browser import search_registry_browser
     from enterprise_scout_mcp.integrations.gsxt_session import load_session as load_gsxt
-    from enterprise_scout_mcp.integrations.gsxt_warmup import warmup_and_save
 
     root = resolve_project_root()
     gsxt = config.integrations.gsxt
@@ -172,16 +211,35 @@ def warmup_gsxt_session(config: AppConfig) -> dict[str, Any]:
     data_dir = Path(gsxt.browser_user_data_dir)
     if not data_dir.is_absolute():
         data_dir = root / data_dir
-    existing = None
+    existing: dict[str, str] = {}
     if dest.is_file():
         raw = load_gsxt(dest)
         if raw and isinstance(raw.get("cookies"), dict):
-            existing = raw["cookies"]
-    result = warmup_and_save(
-        dest,
-        index_url=gsxt.base_url.rstrip("/") + "/index.html",
-        wait_seconds=gsxt.browser_warmup_wait_seconds,
+            existing = {str(k): str(v) for k, v in raw["cookies"].items()}
+    probe = search_registry_browser(
+        probe_keyword,
+        config=gsxt,
+        cookies=existing,
         user_data_dir=data_dir,
-        existing=existing,
+        index_url=gsxt.base_url.rstrip("/") + "/index.html",
     )
-    return {"ok": True, "session": "gsxt", "path": str(dest), "warmup": True, **result}
+    if probe.cookies:
+        save_session(dest, probe.cookies, note="warmup browser search")
+    preview = {
+        k: (v[:8] + "…" if len(v) > 8 else v)
+        for k, v in list((probe.cookies or existing).items())[:5]
+    }
+    out: dict[str, Any] = {
+        "ok": probe.ok,
+        "session": "gsxt",
+        "path": str(dest),
+        "warmup": True,
+        "cookie_count": len(probe.cookies or existing),
+        "cookie_preview": preview,
+        "probe_keyword": probe_keyword,
+        "probe_ok": probe.ok,
+        "probe_message": probe.message,
+    }
+    if probe.row:
+        out["probe_row"] = probe.row
+    return out

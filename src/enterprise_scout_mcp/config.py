@@ -76,10 +76,23 @@ class GsxtConfig(BaseModel):
     session_file: str = "./.state/gsxt_personal_session.json"  # wired from sessions.* on load
     search_url: str = "https://www.gsxt.gov.cn/api/search/testAi"
     search_keyword_field: str = "searchword"
+    # browser: nodriver in-page search (bypasses CT/瑞数 API); api: httpx only; auto: browser then api
+    search_mode: str = "browser"
+    browser_headless: bool = False  # headless often trips GSXT NWAF; use persistent profile
+    browser_search_timeout: float = 45.0
     captcha_mode: str = "manual"
     browser_warmup_on_ct: bool = True  # nodriver refresh when CT 405 after JSL
     browser_warmup_wait_seconds: float = 6.0
     browser_user_data_dir: str = "./.state/gsxt_nodriver_data"
+    # auto | nodriver | playwright_cdp — CDP attach uses real Chrome (Ruishu-safe)
+    browser_backend: str = "auto"
+    # Attach to your real Chrome (bypass NWAF / Ruishu automation fingerprint):
+    # chrome.exe --remote-debugging-port=9222 --user-data-dir=...
+    browser_cdp_host: str = ""
+    browser_cdp_port: int = 0  # 0 = launch nodriver; 9222 = Playwright connect_over_cdp
+    # Static VPN/clash proxy; empty + proxy_from_env=true reads HTTP(S)_PROXY
+    proxy_url: str = ""
+    proxy_from_env: bool = True
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"

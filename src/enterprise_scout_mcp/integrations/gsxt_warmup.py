@@ -14,15 +14,25 @@ async def _collect_cookies_async(
     index_url: str,
     wait_seconds: float,
     user_data_dir: Path,
+    cookies: dict[str, str] | None = None,
+    user_agent: str = "",
 ) -> dict[str, str]:
     import nodriver as uc
 
+    from enterprise_scout_mcp.integrations.gsxt_browser import _collect_cookies, _set_cookies
+
     user_data_dir.mkdir(parents=True, exist_ok=True)
+    browser_args = ["--disable-blink-features=AutomationControlled"]
+    if user_agent:
+        browser_args.append(f"--user-agent={user_agent}")
     browser = await uc.start(
         user_data_dir=str(user_data_dir.resolve()),
         sandbox=False,
+        browser_args=browser_args,
     )
     try:
+        if cookies:
+            await _set_cookies(browser, cookies)
         await browser.get(index_url)
         await asyncio.sleep(wait_seconds)
         raw = await browser.cookies.get_all()
@@ -56,6 +66,8 @@ def browser_warmup_cookies(
                 index_url=index_url,
                 wait_seconds=wait_seconds,
                 user_data_dir=data_dir,
+                cookies=existing,
+                user_agent="",
             )
         )
     except ImportError as exc:

@@ -92,6 +92,50 @@ def _pick(row: dict[str, Any], keys: tuple[str, ...]) -> str:
     return ""
 
 
+def parse_search_html(html: str, keyword: str = "") -> dict[str, str] | None:
+    """Parse GSXT search result page — embedded JSON, tables, or list markup."""
+    if not html or classify_response_text(html) in ("ct_challenge", "jsl_challenge"):
+        return None
+
+    for pattern in (
+        r"uniscId[\"']?\s*[:=]\s*[\"']([0-9A-Z]{18})[\"']",
+        r"creditCode[\"']?\s*[:=]\s*[\"']([0-9A-Z]{18})[\"']",
+        r"统一社会信用代码[^0-9A-Z]{0,20}([0-9A-Z]{18})",
+    ):
+        for block in re.finditer(
+            r".{0,400}?" + pattern,
+            html,
+            flags=re.IGNORECASE | re.DOTALL,
+        ):
+            chunk = block.group(0)
+            code_m = re.search(pattern, chunk, flags=re.IGNORECASE)
+            if not code_m:
+                continue
+            credit = code_m.group(1)
+            name = ""
+            for name_pat in (
+                r"entName[\"']?\s*[:=]\s*[\"']([^\"']+)[\"']",
+                r"corpName[\"']?\s*[:=]\s*[\"']([^\"']+)[\"']",
+                r"<a[^>]*>([^<]{2,80})</a>",
+                r"<span[^>]*class=\"[^\"']*name[^\"']*\"[^>]*>([^<]+)</span>",
+            ):
+                nm = re.search(name_pat, chunk, flags=re.IGNORECASE)
+                if nm:
+                    name = nm.group(1).strip()
+                    break
+            if keyword and name and keyword not in name:
+                continue
+            if name or credit:
+                return {"name": name, "credit_code": credit, "reg_code": credit}
+
+    row = _parse_html(html)
+    if row and keyword and row.get("name") and keyword not in row["name"]:
+        codes = _CREDIT_CODE_RE.findall(html)
+        if len(codes) == 1:
+            row = {**row, "credit_code": codes[0], "reg_code": codes[0]}
+    return row
+
+
 def _parse_html(html: str) -> dict[str, str] | None:
     lower = html.lower()
     if "geetest" in lower or "验证码" in html or "captcha" in lower:
@@ -107,14 +151,38 @@ def _parse_html(html: str) -> dict[str, str] | None:
     }
 
 
+def classify_browser_block(html: str) -> str | None:
+    """Stricter block hints for full GSXT pages (avoid footer 实名注册 false positives)."""
+    lower = html.lower()
+    if "nwaf" in lower or "waf页面" in html:
+        return "blocked"
+    if "environment checking" in lower or "ctct_bundle" in lower:
+        return "ct_challenge"
+    if "document.cookie" in html and "location.href" in html:
+        return "jsl_challenge"
+    login_wall = (
+        "登录后再进行访问" in html
+        or "请先登录" in html
+        or "请登录后" in html
+        or ("user-login" in lower and "keyword" not in lower and "searchword" not in lower)
+    )
+    if login_wall:
+        return "auth_expired"
+    if "geetest" in lower or "验证码" in html:
+        return "captcha"
+    if "IP请求异常" in html or "可疑的攻击" in html:
+        return "blocked"
+    return None
+
+
 def classify_response_text(text: str, *, status_code: int = 0) -> str | None:
-    """Return captcha/auth_expired/block/challenge hint or None."""
+    """Return captcha/auth_expired/block/challenge hint or None (API / short responses)."""
     lower = text.lower()
     if status_code == 521 or ("document.cookie" in text and "location.href" in text):
         return "jsl_challenge"
     if status_code == 405 or "environment checking" in lower or "ctct_bundle" in lower:
         return "ct_challenge"
-    if "实名注册" in text or "登录后再进行访问" in text or "auth" in lower and "login" in lower:
+    if "登录后再进行访问" in text or "请先登录" in text or "请登录后" in text:
         return "auth_expired"
     if "geetest" in lower or "验证码" in text or "captcha" in lower:
         return "captcha"

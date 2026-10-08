@@ -77,7 +77,8 @@ escout import-neo4j              # 写入 Neo4j（需 pip install -e ".[graph]"�
 escout sessions list                              # 统一查看 cookie 路径与就绪状态
 escout sessions import gsxt --from-file cookies.json
 escout sessions import aiqicha --from-file ./secrets/aiqicha_cookies.txt
-escout sessions warmup gsxt                       # 无头浏览器刷新 JSL+CT（需 .[browser]）
+escout sessions cdp-hint                            # GSXT 瑞数：真实 Chrome CDP 接管步骤
+escout sessions warmup gsxt                       # nodriver 刷新 cookie（需 .[browser]）
 escout sync-cookies --from-file ./secrets/aiqicha_cookies.txt   # 兼容别名 → sessions import aiqicha
 escout register-hermes          # 写入 ~/.hermes/config.yaml
 escout doctor --probe           # 含 ENScan / proxy_pool 探活 + sessions
@@ -91,7 +92,24 @@ escout drain-retry --dry-run    # 列出 retry_queue 待重跑任务
 escout drain-retry --limit 20   # 重跑 captcha 队列（成功 → .archive）
 ```
 
-**采集策略（三级源）：** 默认 `ensan_only` — 爱企查 / 天眼查等走 ENScan L2。L1 官方工商：`escout collect 关键词 --dims registry --prefer-tier l1 -p gsxt`（需先在 [shiming.gsxt.gov.cn](https://shiming.gsxt.gov.cn) 个人登录并 `sync-gsxt-session` 导入 cookie）。`routing.l1_fallback_to_l2: true` 时 L1 失败自动降级 ENScan（`degraded=true`）；L1/L2 字段不一致写入 `warehouse/conflicts/part.parquet`。ENScan 不可用时 L2 直接报错。
+**采集策略（三级源）：** 默认 `ensan_only` — 爱企查 / 天眼查等走 ENScan L2。L1 官方工商默认 **`integrations.gsxt.search_mode: browser`**：在**真实浏览器页面环境**内调用搜索 API（绕过瑞数 CT/瑞数对 httpx 的拦截），**不要**对 412/405 盲目重试或换 IP。
+
+| 模式 | 配置 | 说明 |
+|------|------|------|
+| **CDP 接管（推荐）** | `browser_cdp_port: 9222` | 手动启动 Chrome 调试端口 → Playwright `connect_over_cdp` → 页面内 `fetch` / 站点原生 ajax |
+| nodriver 自建 | `browser_cdp_port: 0` | 持久 profile + 有头浏览器；NWAF 仍可能拦截自动化指纹 |
+| httpx API | `search_mode: api` | 仅 JSL 可过；瑞数 Environment Checking 会 412 |
+
+```powershell
+pip install -e ".[browser]"
+escout sessions cdp-hint                    # 打印 Chrome 启动命令与步骤
+# 1) 按 hint 启动 Chrome，打开 gsxt.gov.cn 并完成验证
+# 2) config.yaml: browser_cdp_port: 9222
+escout sessions import gsxt --from-file .state/gsxt_browser_export.json
+escout smoke-registry-l1 苏州挚途
+```
+
+VPN/Clash：`proxy_url: http://127.0.0.1:7897` 或 `$env:HTTPS_PROXY=...`（改善连通性，**不能**单独绕过瑞数环境检测）。`routing.l1_fallback_to_l2: true` 时 L1 仍失败则降级 ENScan（`degraded=true`）。
 
 默认 `fields`：`enterprise_info,partner,holds,invest,branch`（写入实体 + 股权边）。可用 `-f` / MCP `fields` 覆盖。
 

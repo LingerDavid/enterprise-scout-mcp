@@ -244,6 +244,11 @@ def cmd_sessions(args: argparse.Namespace) -> int:
             return 1
         _print_json(result)
         return 0
+    if args.sessions_cmd == "cdp-hint":
+        from enterprise_scout_mcp.sessions.registry import gsxt_cdp_hint
+
+        _print_json(gsxt_cdp_hint(config))
+        return 0
     return 2
 
 
@@ -415,6 +420,11 @@ def build_parser() -> argparse.ArgumentParser:
     sess_warmup.add_argument("name", choices=["gsxt"], default="gsxt", nargs="?")
     sess_warmup.add_argument("--from-file", default=None, help="Optional import before warmup")
     sess_warmup.set_defaults(func=cmd_sessions, sessions_cmd="warmup")
+    sess_cdp = sess_sub.add_parser(
+        "cdp-hint",
+        help="How to attach real Chrome via CDP for GSXT (Ruishu / NWAF bypass)",
+    )
+    sess_cdp.set_defaults(func=cmd_sessions, sessions_cmd="cdp-hint")
 
     sync = sub.add_parser("sync-cookies", help="[alias] escout sessions import aiqicha")
     sync.add_argument("--from-file", default=None, help="Cookie file")

@@ -18,7 +18,12 @@ def test_parse_search_json_list():
 
 
 def test_classify_auth_expired():
-    assert classify_response_text("请访问 shiming 实名注册/登录后再进行访问") == "auth_expired"
+    assert classify_response_text("登录后再进行访问") == "auth_expired"
+
+
+def test_footer_实名注册_not_auth_expired():
+    html = "自然人必须实名注册后才能使用个人中心相关功能"
+    assert classify_response_text(html) is None
 
 
 def test_classify_captcha():

@@ -69,6 +69,11 @@ def build_doctor_report(
             "enabled": gsxt.enabled,
             "base_url": gsxt.base_url,
             "search_url": gsxt.search_url,
+            "search_mode": gsxt.search_mode,
+            "browser_backend": gsxt.browser_backend,
+            "browser_cdp_port": gsxt.browser_cdp_port,
+            "browser_headless": gsxt.browser_headless,
+            "proxy_url": gsxt.proxy_url or None,
             "available": gsxt_channel.available(),
         },
         "ensan_go": {

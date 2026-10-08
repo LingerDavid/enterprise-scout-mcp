@@ -42,6 +42,15 @@ integrations:
     session_mode: personal
     session_file: "./.state/gsxt_personal_session.json"
     search_url: "https://www.gsxt.gov.cn/api/search/testAi"
+    search_mode: browser          # browser (default) | api | auto
+    browser_backend: auto         # auto | nodriver | playwright_cdp
+    browser_headless: false       # true 易触发 NWAF；首次用 false 建 profile
+    browser_search_timeout: 45
+    # Ruishu/NWAF 根治：先手动启动真实 Chrome，再 Playwright connect_over_cdp
+    browser_cdp_host: "127.0.0.1"
+    browser_cdp_port: 0           # 9222 = 接管已打开的 Chrome（escout sessions cdp-hint）
+    proxy_url: ""                 # 或 http://127.0.0.1:7897；空则读 HTTP(S)_PROXY 环境变量
+    proxy_from_env: true
     captcha_mode: manual
     browser_warmup_on_ct: true
     browser_warmup_wait_seconds: 6
