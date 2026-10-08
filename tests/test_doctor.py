@@ -26,6 +26,13 @@ def test_doctor_report_keys() -> None:
     assert "script_exists" in report["nodriver"]
     assert "entities_exists" in report["warehouse"]
     assert "sidecars" not in report
+    arch = report["architecture"]
+    assert arch["persona"]["implemented"] is True
+    assert arch["consistency"]["implemented"] is True
+    assert "timezone" in arch["consistency"]["checks"]
+    assert "camoufox" in arch["disguise_egress"]
+    assert arch["captcha_branch"]["strategy"] == "rotate_ip"
+    assert arch["phase2"]["credit"] is False
 
 
 def test_doctor_probe_sidecars_attached() -> None:

@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
+from enterprise_scout_mcp.captcha.opencv_slider import opencv_available
 from enterprise_scout_mcp.config import AppConfig, resolve_project_root
 from enterprise_scout_mcp.sessions.registry import list_sessions
 from enterprise_scout_mcp.diagnostics.sidecars import build_sidecar_report
 from enterprise_scout_mcp.models import ChannelKind, Dimension
 from enterprise_scout_mcp.scheduler import CollectorScheduler
+from enterprise_scout_mcp.transport.camoufox_backend import camoufox_available
 
 
 def _resolve(root: Path, rel: str) -> Path:
@@ -102,6 +105,47 @@ def build_doctor_report(
             "enabled": config.integrations.proxy_pool.enabled,
             "base_url": config.integrations.proxy_pool.base_url,
             "note": "unused under ensan_only (ENScan owns egress)",
+        },
+        "architecture": {
+            "persona": {"implemented": True},
+            "risk_routing": {"implemented": True},
+            "behavior": {"implemented": True},
+            "consistency": {
+                "implemented": True,
+                "checks": ["ua", "tls", "locale", "language", "geo", "timezone", "os", "sec-ch-ua"],
+            },
+            "disguise_egress": {
+                "curl_cffi": {
+                    "enabled": config.integrations.curl_cffi.enabled,
+                    "impersonate": config.integrations.curl_cffi.impersonate,
+                },
+                "camoufox": {
+                    "enabled": config.integrations.camoufox.enabled,
+                    "available": camoufox_available().available,
+                    "message": camoufox_available().message,
+                },
+            },
+            "captcha_branch": {
+                "strategy": config.integrations.captcha.strategy,
+                "solver_provider": config.integrations.captcha.solver_provider or None,
+                "solver_configured": bool(
+                    config.integrations.captcha.solver_api_key
+                    or os.environ.get("CAPSOLVER_API_KEY")
+                ),
+                "opencv_available": opencv_available(),
+                "strategies": ["rotate_ip", "solver_api", "opencv_slider", "manual"],
+            },
+            "channels": {
+                "ensan_go": True,
+                "playwright": True,
+                "gsxt_cdp": True,
+                "handaas": True,
+            },
+            "phase2": {
+                "credit": False,
+                "judicial": False,
+                "note": "not started",
+            },
         },
         "warehouse": {
             "dir": str(wh),

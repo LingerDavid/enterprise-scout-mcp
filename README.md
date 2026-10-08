@@ -134,11 +134,24 @@ VPN/Clash：`proxy_url: http://127.0.0.1:7897` 或 `$env:HTTPS_PROXY=...`（改�
 ```
 MCP (enterprise-scout-mcp)
   └─ CollectorScheduler
-       ├─ TierAwareRouter     ← L1 GSXT / L2 ENScan (when --prefer-tier)
-       ├─ RiskAwareRouter     ← ensan_only default for aiqicha/tyc
-       ├─ GsxtOfficialChannel ← L1 registry (personal session)
-       ├─ EnsanGoChannel      ← L2 ENScan :31000
-       └─ HandaasChannel      ← optional paid API
+       ├─ PersonaEngine         ← 人设 UA / locale / tz / OS
+       ├─ RiskAwareRouter       ← ensan_only default for aiqicha/tyc
+       ├─ TierAwareRouter       ← L1 GSXT / L2 ENScan (--prefer-tier)
+       ├─ BehaviorOrchestrator  ← 配额 / 冷却 / 延迟
+       ├─ EnvironmentValidator  ← UA/TLS/locale/语言/geo/时区/OS
+       ├─ disguise egress       ← curl_cffi [transport] · Camoufox [camoufox]
+       ├─ CaptchaHandler        ← rotate_ip | CapSolver API | OpenCV 滑块 [captcha]
+       ├─ GsxtOfficialChannel   ← L1 registry (CDP / nodriver)
+       ├─ EnsanGoChannel        ← L2 ENScan :31000
+       └─ HandaasChannel        ← optional paid API
+```
+
+模块落地状态见 `escout doctor` → `architecture`。可选依赖：
+
+```powershell
+pip install -e ".[transport]"   # curl_cffi TLS 伪装
+pip install -e ".[camoufox]"    # Camoufox 浏览器出口
+pip install -e ".[captcha]"     # OpenCV 滑块定位
 ```
 
 ## Sidecar

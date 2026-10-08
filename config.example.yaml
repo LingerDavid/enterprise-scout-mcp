@@ -93,6 +93,19 @@ integrations:
     enabled: false
     impersonate: "chrome131"
 
+  # Camoufox anti-detect Firefox — pip install -e ".[camoufox]"
+  camoufox:
+    enabled: false
+    headless: true
+    humanize: true
+
+  # Captcha branch: rotate_ip | solver_api | opencv_slider | manual
+  # solver: set CAPSOLVER_API_KEY or solver_api_key; pip install -e ".[captcha]" for OpenCV
+  captcha:
+    strategy: rotate_ip
+    solver_provider: ""          # capsolver
+    solver_api_key: ""
+
 output:
   warehouse_dir: "G:/enterprise_lake/warehouse"
   raw_dir: "G:/enterprise_lake/raw"

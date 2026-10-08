@@ -10,6 +10,7 @@ dependencies = [
     "pydantic>=2.10.0,<3",
     "mcp>=1.6.0,<2",
     "python-dotenv>=1.0.0,<2",
+    "tzdata>=2024.1; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
@@ -19,6 +20,13 @@ transport = [
 browser = [
     "playwright>=1.49.0,<2",
     "nodriver>=0.38,<1",
+]
+camoufox = [
+    "camoufox[geoip]>=0.4.11,<1",
+]
+captcha = [
+    "opencv-python-headless>=4.10.0,<5",
+    "numpy>=2.0.0,<3",
 ]
 warehouse = [
     "pyarrow>=18.0.0,<22",

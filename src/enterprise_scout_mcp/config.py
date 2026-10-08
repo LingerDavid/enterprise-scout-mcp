@@ -48,6 +48,22 @@ class CurlCffiConfig(BaseModel):
     impersonate: str = "chrome131"
 
 
+class CamoufoxConfig(BaseModel):
+    """Anti-detect Firefox backend (optional) — pip install -e '.[camoufox]'."""
+
+    enabled: bool = False
+    headless: bool = True
+    humanize: bool = True
+
+
+class CaptchaConfig(BaseModel):
+    """Captcha branch: rotate_ip | solver_api | opencv_slider | manual."""
+
+    strategy: str = "rotate_ip"
+    solver_provider: str = ""  # capsolver
+    solver_api_key: str = ""  # or env CAPSOLVER_API_KEY
+
+
 class SessionsConfig(BaseModel):
     """Unified cookie/session store — authoritative paths for GSXT L1 and aiqicha L2."""
 
@@ -107,6 +123,8 @@ class IntegrationsConfig(BaseModel):
     handaas: HandaasConfig = Field(default_factory=HandaasConfig)
     playwright: PlaywrightConfig = Field(default_factory=PlaywrightConfig)
     curl_cffi: CurlCffiConfig = Field(default_factory=CurlCffiConfig)
+    camoufox: CamoufoxConfig = Field(default_factory=CamoufoxConfig)
+    captcha: CaptchaConfig = Field(default_factory=CaptchaConfig)
 
 
 class PersonasConfig(BaseModel):

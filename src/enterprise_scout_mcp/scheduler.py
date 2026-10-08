@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from enterprise_scout_mcp.behavior.orchestrator import BehaviorOrchestrator
-from enterprise_scout_mcp.captcha.handler import CaptchaHandler, CaptchaStrategy
+from enterprise_scout_mcp.captcha.handler import build_captcha_handler
 from enterprise_scout_mcp.channels.base import CollectionChannel
 from enterprise_scout_mcp.channels.ensan_go import EnsanGoChannel
 from enterprise_scout_mcp.channels.handaas_api import HandaasChannel
@@ -26,6 +27,7 @@ from enterprise_scout_mcp.persona.engine import PersonaEngine
 from enterprise_scout_mcp.routing.risk_router import RiskAwareRouter
 from enterprise_scout_mcp.routing.tier_router import RouteDecision, TierAwareRouter
 from enterprise_scout_mcp.state.store import StateStore
+from enterprise_scout_mcp.transport.camoufox_backend import CamoufoxTransport
 from enterprise_scout_mcp.transport.curl_cffi_backend import CurlCffiTransport
 from enterprise_scout_mcp.transport.egress import EgressContext
 from enterprise_scout_mcp.transport.proxy_pool import ProxyPoolClient
@@ -48,10 +50,20 @@ class CollectorScheduler:
         self._consistency = EnvironmentValidator()
         self._output = OutputRouter(config.output)
         self._proxy = self._build_proxy_client()
-        self._captcha = CaptchaHandler(
+        cap = config.integrations.captcha
+        api_key = cap.solver_api_key or os.environ.get("CAPSOLVER_API_KEY", "")
+        self._captcha = build_captcha_handler(
             proxy_client=self._proxy,
-            default_strategy=CaptchaStrategy.ROTATE_IP,
+            strategy=cap.strategy,
+            solver_provider=cap.solver_provider,
+            solver_api_key=api_key,
         )
+        self._camoufox: CamoufoxTransport | None = None
+        if config.integrations.camoufox.enabled:
+            self._camoufox = CamoufoxTransport(
+                headless=config.integrations.camoufox.headless,
+                humanize=config.integrations.camoufox.humanize,
+            )
 
         self._channels: dict[ChannelKind, CollectionChannel] = {
             ChannelKind.GSXT_OFFICIAL: GsxtOfficialChannel(

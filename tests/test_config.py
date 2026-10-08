@@ -16,3 +16,10 @@ def test_neo4j_defaults_match_enterpriselake() -> None:
 def test_app_config_has_neo4j_section() -> None:
     cfg = AppConfig()
     assert cfg.neo4j.uri.startswith("bolt://")
+
+
+def test_captcha_and_camoufox_defaults() -> None:
+    cfg = AppConfig()
+    assert cfg.integrations.captcha.strategy == "rotate_ip"
+    assert cfg.integrations.camoufox.enabled is False
+    assert cfg.integrations.curl_cffi.enabled is False
