@@ -32,7 +32,9 @@ def test_doctor_report_keys() -> None:
     assert "timezone" in arch["consistency"]["checks"]
     assert "camoufox" in arch["disguise_egress"]
     assert arch["captcha_branch"]["strategy"] == "rotate_ip"
-    assert arch["phase2"]["credit"] is False
+    assert report["tiers"]["equity"]["implemented"] is True
+    assert report["tiers"]["l3"]["implemented"] is True
+    assert arch["phase2"]["credit"] is True
 
 
 def test_doctor_probe_sidecars_attached() -> None:

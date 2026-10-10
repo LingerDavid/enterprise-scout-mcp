@@ -11,3 +11,4 @@ class EgressContext:
     impersonate: str | None = None
     user_agent: str | None = None
     accept_language: str | None = None
+    browser_backend: str | None = None  # nodriver | camoufox

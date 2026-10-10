@@ -7,7 +7,11 @@ from pathlib import Path
 
 from enterprise_scout_mcp.behavior.orchestrator import BehaviorOrchestrator
 from enterprise_scout_mcp.captcha.handler import build_captcha_handler
+from dataclasses import replace
+
+from enterprise_scout_mcp.channels.academic_l3 import AcademicL3Channel
 from enterprise_scout_mcp.channels.base import CollectionChannel
+from enterprise_scout_mcp.channels.deferred import DeferredDimensionChannel
 from enterprise_scout_mcp.channels.ensan_go import EnsanGoChannel
 from enterprise_scout_mcp.channels.handaas_api import HandaasChannel
 from enterprise_scout_mcp.channels.official.gsxt import GsxtOfficialChannel
@@ -18,9 +22,11 @@ from enterprise_scout_mcp.models import (
     ChannelKind,
     CollectResult,
     CollectTask,
+    Dimension,
     ResultGrade,
     SourceTier,
 )
+from enterprise_scout_mcp.routing.dimension_plan import resolve_fields
 from enterprise_scout_mcp.output.conflict_schema import detect_registry_conflicts
 from enterprise_scout_mcp.output.router import OutputRouter
 from enterprise_scout_mcp.persona.engine import PersonaEngine
@@ -76,6 +82,8 @@ class CollectorScheduler:
                 project_root=root,
             ),
             ChannelKind.HANDAAS_API: HandaasChannel(config.integrations.handaas),
+            ChannelKind.ACADEMIC_L3: AcademicL3Channel(),
+            ChannelKind.DEFERRED: DeferredDimensionChannel(),
         }
         self._transport = (
             CurlCffiTransport(config.integrations.curl_cffi.impersonate)
@@ -100,11 +108,48 @@ class CollectorScheduler:
     def _build_egress(self, persona, proxy_url: str | None) -> EgressContext:
         curl = self._config.integrations.curl_cffi
         headers = self._transport.build_headers(persona) if self._transport else {}
+        browser_backend: str | None = None
+        if self._camoufox is not None and self._config.integrations.camoufox.enabled:
+            browser_backend = "camoufox"
         return EgressContext(
             proxy_url=proxy_url,
             impersonate=curl.impersonate if curl.enabled else None,
             user_agent=headers.get("User-Agent") or persona.user_agent or None,
             accept_language=headers.get("Accept-Language") or persona.locale or None,
+            browser_backend=browser_backend,
+        )
+
+    _GRADE_RANK = {
+        ResultGrade.OK: 0,
+        ResultGrade.PARTIAL: 1,
+        ResultGrade.AUTH_EXPIRED: 2,
+        ResultGrade.CAPTCHA: 3,
+        ResultGrade.BLOCKED: 4,
+        ResultGrade.ERROR: 5,
+    }
+
+    def _merge_results(self, left: CollectResult, right: CollectResult) -> CollectResult:
+        merged_data = dict(left.data)
+        for key, val in right.data.items():
+            if key in merged_data and isinstance(merged_data[key], list) and isinstance(val, list):
+                merged_data[key] = merged_data[key] + val
+            else:
+                merged_data[key] = val
+        lr = self._GRADE_RANK.get(left.grade, 99)
+        rr = self._GRADE_RANK.get(right.grade, 99)
+        primary = left if lr >= rr else right
+        secondary = right if primary is left else left
+        msg_parts = [m for m in (left.message, right.message) if m]
+        return CollectResult(
+            task=left.task,
+            channel=primary.channel,
+            grade=primary.grade,
+            data=merged_data,
+            message="; ".join(dict.fromkeys(msg_parts)),
+            persona_id=primary.persona_id or secondary.persona_id,
+            source_tier=primary.source_tier or secondary.source_tier,
+            dimension=primary.dimension or secondary.dimension,
+            degraded=primary.degraded or secondary.degraded,
         )
 
     def _use_tier_router(self, task: CollectTask) -> bool:
@@ -165,6 +210,31 @@ class CollectorScheduler:
         return l1_result
 
     def run(
+        self,
+        task: CollectTask,
+        *,
+        persona_id: str | None = None,
+        import_neo4j: bool = True,
+    ) -> CollectResult:
+        if len(task.dimensions) <= 1:
+            return self._run_single(task, persona_id=persona_id, import_neo4j=import_neo4j)
+
+        merged: CollectResult | None = None
+        for dim in task.dimensions:
+            sub = replace(
+                task,
+                dimensions=(dim,),
+                fields=resolve_fields(task, dim),
+            )
+            part = self._run_single(sub, persona_id=persona_id, import_neo4j=False)
+            merged = part if merged is None else self._merge_results(merged, part)
+        assert merged is not None
+        self._output.persist(merged)
+        if import_neo4j and merged.grade in (ResultGrade.OK, ResultGrade.PARTIAL):
+            self.maybe_import_neo4j()
+        return merged
+
+    def _run_single(
         self,
         task: CollectTask,
         *,
@@ -245,7 +315,7 @@ class CollectorScheduler:
             self._behavior.on_captcha(pid)
             action = self._captcha.handle(result, bad_proxy=proxy_url)
             if action.retry:
-                return self.run(task, persona_id=pid, import_neo4j=import_neo4j)
+                return self._run_single(task, persona_id=pid, import_neo4j=import_neo4j)
         elif result.grade == ResultGrade.BLOCKED:
             self._behavior.on_block(pid)
 

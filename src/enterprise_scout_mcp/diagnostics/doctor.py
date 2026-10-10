@@ -63,10 +63,26 @@ def build_doctor_report(
                 "implemented": True,
                 "available": scheduler._channels[ChannelKind.ENSCAN_GO].available(),
             },
-            "l3": {"implemented": False, "note": "academic ingest stub"},
-            "equity": {"implemented": False},
-            "credit": {"implemented": False},
-            "judicial": {"implemented": False},
+            "l3": {
+                "implemented": True,
+                "channel": ChannelKind.ACADEMIC_L3.value,
+                "note": "stub until external corpus wired",
+            },
+            "equity": {
+                "implemented": True,
+                "channel": ChannelKind.ENSCAN_GO.value,
+                "fields": ["partner", "holds", "invest", "branch"],
+            },
+            "credit": {
+                "implemented": True,
+                "channel": ChannelKind.DEFERRED.value,
+                "note": "stub; enable handaas for paid complement",
+            },
+            "judicial": {
+                "implemented": True,
+                "channel": ChannelKind.DEFERRED.value,
+                "note": "stub; enable handaas for paid complement",
+            },
         },
         "gsxt": {
             "enabled": gsxt.enabled,
@@ -142,9 +158,9 @@ def build_doctor_report(
                 "handaas": True,
             },
             "phase2": {
-                "credit": False,
-                "judicial": False,
-                "note": "not started",
+                "credit": True,
+                "judicial": True,
+                "note": "deferred stub channel; full paid ingest via handaas optional",
             },
         },
         "warehouse": {

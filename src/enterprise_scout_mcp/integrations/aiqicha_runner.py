@@ -74,6 +74,8 @@ def _egress_args(egress: EgressContext | None) -> list[str]:
         args.extend(["--user-agent", egress.user_agent])
     if egress.accept_language:
         args.extend(["--accept-language", egress.accept_language])
+    if egress.browser_backend:
+        args.extend(["--browser-backend", egress.browser_backend])
     return args
 
 
@@ -125,6 +127,7 @@ def fetch_with_fallback(
     if nodriver_user_data_dir is not None:
         extra.extend(["--user-data-dir", str(nodriver_user_data_dir)])
 
+    extra.extend(_egress_args(egress))
     return run_script(
         nodriver_script,
         keyword,

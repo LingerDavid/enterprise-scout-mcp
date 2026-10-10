@@ -23,6 +23,8 @@ class ChannelKind(str, Enum):
     ENSCAN_GO = "enscan_go"
     PLAYWRIGHT = "playwright"
     HANDAAS_API = "handaas_api"
+    ACADEMIC_L3 = "academic_l3"
+    DEFERRED = "deferred"
 
 
 class SourceTier(str, Enum):

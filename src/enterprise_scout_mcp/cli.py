@@ -353,7 +353,11 @@ def build_parser() -> argparse.ArgumentParser:
     collect.add_argument("keyword", help="Company name or keyword")
     collect.add_argument("-p", "--platform", default="aiqicha", type=str)
     collect.add_argument("-f", "--fields", default="", help="Comma-separated ENScan fields")
-    collect.add_argument("--dims", default="", help="Dimensions: registry (L1 spike)")
+    collect.add_argument(
+        "--dims",
+        default="",
+        help="Dimensions: registry,equity,digital,ip,credit,judicial (comma-separated)",
+    )
     collect.add_argument(
         "--prefer-tier",
         default=None,

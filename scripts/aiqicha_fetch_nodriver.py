@@ -60,7 +60,24 @@ def main() -> int:
     p.add_argument("--cookie-file", type=Path, default=None)
     p.add_argument("--timeout", type=float, default=60.0)
     p.add_argument("--user-data-dir", type=Path, default=Path("./nodriver_data"))
+    p.add_argument("--browser-backend", default="nodriver", help="nodriver | camoufox")
+    p.add_argument("--proxy", default="")
+    p.add_argument("--impersonate", default="")
+    p.add_argument("--user-agent", default="")
+    p.add_argument("--accept-language", default="")
     args = p.parse_args()
+
+    if args.browser_backend == "camoufox":
+        print(
+            json.dumps(
+                {
+                    "status": "error",
+                    "message": "camoufox backend accepted; wire fetch in script or use nodriver",
+                    "source": "camoufox",
+                }
+            )
+        )
+        return 1
 
     mod = _load_fetch_module()
     args.db.parent.mkdir(parents=True, exist_ok=True)

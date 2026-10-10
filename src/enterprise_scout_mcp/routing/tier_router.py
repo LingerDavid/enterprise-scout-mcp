@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from enterprise_scout_mcp.config import RoutingConfig
 from enterprise_scout_mcp.models import ChannelKind, CollectTask, Dimension, SourceTier
+from enterprise_scout_mcp.routing.dimension_plan import channel_for, is_stub_dimension
 
 
 @dataclass(frozen=True)
@@ -13,11 +14,6 @@ class RouteDecision:
     channel: ChannelKind
     source_tier: SourceTier
     dimension: Dimension
-
-
-_IMPLEMENTED: dict[tuple[Dimension, SourceTier], ChannelKind] = {
-    (Dimension.REGISTRY, SourceTier.L1): ChannelKind.GSXT_OFFICIAL,
-}
 
 
 class TierAwareRouter:
@@ -41,12 +37,23 @@ class TierAwareRouter:
         dim = task.primary_dimension
         tier = task.prefer_tier or SourceTier.L1
 
-        if dim != Dimension.REGISTRY:
-            raise RuntimeError(
-                f"dimension {dim.value!r} not implemented yet; only registry L1 spike is available"
+        if tier == SourceTier.L3:
+            return RouteDecision(
+                channel=ChannelKind.ACADEMIC_L3,
+                source_tier=SourceTier.L3,
+                dimension=dim,
             )
 
-        if tier == SourceTier.L1:
+        if is_stub_dimension(dim):
+            return RouteDecision(
+                channel=ChannelKind.DEFERRED,
+                source_tier=SourceTier.L2,
+                dimension=dim,
+            )
+
+        channel = channel_for(dim, tier)
+
+        if channel == ChannelKind.GSXT_OFFICIAL:
             if not gsxt_available and not self._config.gsxt_allow_unavailable:
                 raise RuntimeError(
                     "GSXT L1 unavailable: no personal session — "
@@ -55,16 +62,16 @@ class TierAwareRouter:
             return RouteDecision(
                 channel=ChannelKind.GSXT_OFFICIAL,
                 source_tier=SourceTier.L1,
-                dimension=Dimension.REGISTRY,
+                dimension=dim,
             )
 
-        if tier == SourceTier.L2:
+        if channel == ChannelKind.ENSCAN_GO:
             if not ensan_available:
-                raise RuntimeError("ENScan L2 unavailable for registry fallback")
+                raise RuntimeError(f"ENScan L2 unavailable for dimension {dim.value!r}")
             return RouteDecision(
                 channel=ChannelKind.ENSCAN_GO,
                 source_tier=SourceTier.L2,
-                dimension=Dimension.REGISTRY,
+                dimension=dim,
             )
 
-        raise RuntimeError(f"source tier {tier.value!r} not implemented for {dim.value!r}")
+        raise RuntimeError(f"no route for dimension={dim.value!r} tier={tier.value!r}")

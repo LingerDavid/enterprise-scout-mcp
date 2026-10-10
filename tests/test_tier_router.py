@@ -38,7 +38,7 @@ def test_tier_router_l2_registry_enscan():
     assert decision.source_tier == SourceTier.L2
 
 
-def test_tier_router_unimplemented_dimension():
+def test_tier_router_equity_routes_enscan_l2():
     router = TierAwareRouter(RoutingConfig())
     task = CollectTask(
         keyword="x",
@@ -46,5 +46,33 @@ def test_tier_router_unimplemented_dimension():
         dimensions=(Dimension.EQUITY,),
         prefer_tier=SourceTier.L1,
     )
-    with pytest.raises(RuntimeError, match="not implemented"):
-        router.select(task, gsxt_available=True, ensan_available=True)
+    decision = router.select(task, gsxt_available=True, ensan_available=True)
+    assert decision.channel == ChannelKind.ENSCAN_GO
+    assert decision.source_tier == SourceTier.L2
+    assert decision.dimension == Dimension.EQUITY
+
+
+def test_tier_router_credit_deferred():
+    router = TierAwareRouter(RoutingConfig())
+    task = CollectTask(
+        keyword="x",
+        platform=Platform.GSXT,
+        dimensions=(Dimension.CREDIT,),
+        prefer_tier=SourceTier.L2,
+    )
+    decision = router.select(task, gsxt_available=True, ensan_available=True)
+    assert decision.channel == ChannelKind.DEFERRED
+    assert decision.dimension == Dimension.CREDIT
+
+
+def test_tier_router_l3_academic():
+    router = TierAwareRouter(RoutingConfig())
+    task = CollectTask(
+        keyword="x",
+        platform=Platform.GSXT,
+        dimensions=(Dimension.REGISTRY,),
+        prefer_tier=SourceTier.L3,
+    )
+    decision = router.select(task, gsxt_available=True, ensan_available=True)
+    assert decision.channel == ChannelKind.ACADEMIC_L3
+    assert decision.source_tier == SourceTier.L3

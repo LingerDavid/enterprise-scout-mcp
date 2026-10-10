@@ -146,7 +146,9 @@ MCP (enterprise-scout-mcp)
        └─ HandaasChannel        ← optional paid API
 ```
 
-模块落地状态见 `escout doctor` → `architecture`。可选依赖：
+**维度路由**（`--dims` / MCP `dims`）：`registry`（L1 GSXT / L2 ENScan）、`equity`（股东/投资/分支 → ENScan）、`digital`/`ip`（备案/小程序等 → ENScan）、`credit`/`judicial`（deferred stub，可接 Handaas）、`prefer-tier l3`（academic stub）。多维度一次采集会自动合并 payload。
+
+模块落地状态见 `escout doctor` → `architecture` / `tiers`。可选依赖：
 
 ```powershell
 pip install -e ".[transport]"   # curl_cffi TLS 伪装
