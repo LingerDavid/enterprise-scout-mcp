@@ -64,6 +64,14 @@ class CaptchaConfig(BaseModel):
     solver_api_key: str = ""  # or env CAPSOLVER_API_KEY
 
 
+class CorpusConfig(BaseModel):
+    """Local JSON/JSONL corpus for L3 academic and judicial dimensions."""
+
+    enabled: bool = True
+    l3_dir: str = "G:/enterprise_lake/corpus/l3"
+    judicial_dir: str = "G:/enterprise_lake/corpus/judicial"
+
+
 class SessionsConfig(BaseModel):
     """Unified cookie/session store — authoritative paths for GSXT L1 and aiqicha L2."""
 
@@ -125,6 +133,7 @@ class IntegrationsConfig(BaseModel):
     curl_cffi: CurlCffiConfig = Field(default_factory=CurlCffiConfig)
     camoufox: CamoufoxConfig = Field(default_factory=CamoufoxConfig)
     captcha: CaptchaConfig = Field(default_factory=CaptchaConfig)
+    corpus: CorpusConfig = Field(default_factory=CorpusConfig)
 
 
 class PersonasConfig(BaseModel):

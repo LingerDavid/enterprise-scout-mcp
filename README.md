@@ -90,7 +90,10 @@ escout collect 苏州挚途 --dims registry --prefer-tier l1 -p gsxt
 escout smoke-registry-l1 苏州挚途                  # L1 registry 穿通验收
 escout drain-retry --dry-run    # 列出 retry_queue 待重跑任务
 escout drain-retry --limit 20   # 重跑 captcha 队列（成功 → .archive）
+escout corpus status            # L3 / judicial 语料目录状态
 ```
+
+语料格式见 [docs/corpus-schema.md](docs/corpus-schema.md)。
 
 **采集策略（三级源）：** 默认 `ensan_only` — 爱企查 / 天眼查等走 ENScan L2。L1 官方工商默认 **`integrations.gsxt.search_mode: browser`**：在**真实浏览器页面环境**内调用搜索 API（绕过瑞数 CT/瑞数对 httpx 的拦截），**不要**对 412/405 盲目重试或换 IP。
 
@@ -146,7 +149,7 @@ MCP (enterprise-scout-mcp)
        └─ HandaasChannel        ← optional paid API
 ```
 
-**维度路由**（`--dims` / MCP `dims`）：`registry`（L1 GSXT / L2 ENScan）、`equity`（股东/投资/分支 → ENScan）、`digital`/`ip`（备案/小程序等 → ENScan）、`credit`（Handaas 凭证可用时走付费 API）/`judicial`（deferred stub）、`prefer-tier l3`（academic stub）。多维度一次采集会自动合并 payload。
+**维度路由**（`--dims` / MCP `dims`）：`registry`（L1 GSXT / L2 ENScan）、`equity`（股东/投资/分支 → ENScan）、`digital`/`ip`（备案/小程序等 → ENScan）、`credit`（Handaas 凭证可用时走付费 API）/`judicial`（本地 corpus 或 stub）/`prefer-tier l3`（`corpus/l3` JSON/JSONL）、`prefer-tier l3`（academic stub）。多维度一次采集会自动合并 payload。
 
 模块落地状态见 `escout doctor` → `architecture` / `tiers`。可选依赖：
 

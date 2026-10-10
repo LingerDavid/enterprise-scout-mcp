@@ -82,8 +82,14 @@ class CollectorScheduler:
                 project_root=root,
             ),
             ChannelKind.HANDAAS_API: HandaasChannel(config.integrations.handaas),
-            ChannelKind.ACADEMIC_L3: AcademicL3Channel(),
-            ChannelKind.DEFERRED: DeferredDimensionChannel(),
+            ChannelKind.ACADEMIC_L3: AcademicL3Channel(
+                config.integrations.corpus,
+                project_root=root,
+            ),
+            ChannelKind.DEFERRED: DeferredDimensionChannel(
+                config.integrations.corpus,
+                project_root=root,
+            ),
         }
         self._transport = (
             CurlCffiTransport(config.integrations.curl_cffi.impersonate)

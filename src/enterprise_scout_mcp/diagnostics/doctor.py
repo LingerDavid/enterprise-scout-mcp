@@ -7,6 +7,7 @@ from pathlib import Path
 
 from enterprise_scout_mcp.captcha.opencv_slider import opencv_available
 from enterprise_scout_mcp.config import AppConfig, resolve_project_root
+from enterprise_scout_mcp.integrations.corpus_lookup import corpus_dir_stats
 from enterprise_scout_mcp.sessions.registry import list_sessions
 from enterprise_scout_mcp.diagnostics.sidecars import build_sidecar_report
 from enterprise_scout_mcp.models import ChannelKind, Dimension
@@ -39,6 +40,12 @@ def build_doctor_report(
     edges = wh / "edges" / "equity" / "part.parquet"
     session_path = _resolve(root, gsxt.session_file)
     gsxt_channel = scheduler._channels[ChannelKind.GSXT_OFFICIAL]
+    corpus = config.integrations.corpus
+    l3_dir = _resolve(root, corpus.l3_dir)
+    judicial_dir = _resolve(root, corpus.judicial_dir)
+    l3_stats = corpus_dir_stats(l3_dir)
+    judicial_stats = corpus_dir_stats(judicial_dir)
+    l3_channel = scheduler._channels[ChannelKind.ACADEMIC_L3]
 
     report: dict = {
         "project_root": str(root),
@@ -66,7 +73,10 @@ def build_doctor_report(
             "l3": {
                 "implemented": True,
                 "channel": ChannelKind.ACADEMIC_L3.value,
-                "note": "stub until external corpus wired",
+                "available": l3_channel.available(),
+                "corpus_dir": str(l3_dir),
+                "corpus_files": l3_stats["files"],
+                "note": "JSON/JSONL under integrations.corpus.l3_dir",
             },
             "equity": {
                 "implemented": True,
@@ -83,8 +93,15 @@ def build_doctor_report(
             "judicial": {
                 "implemented": True,
                 "channel": ChannelKind.DEFERRED.value,
-                "note": "stub; enable handaas for paid complement",
+                "corpus_dir": str(judicial_dir),
+                "corpus_files": judicial_stats["files"],
+                "note": "local corpus JSON/JSONL or deferred stub",
             },
+        },
+        "corpus": {
+            "enabled": corpus.enabled,
+            "l3": l3_stats,
+            "judicial": judicial_stats,
         },
         "gsxt": {
             "enabled": gsxt.enabled,
@@ -162,7 +179,7 @@ def build_doctor_report(
             "phase2": {
                 "credit": True,
                 "judicial": True,
-                "note": "deferred stub channel; full paid ingest via handaas optional",
+                "note": "credit→Handaas when creds set; judicial→local corpus or stub",
             },
         },
         "warehouse": {

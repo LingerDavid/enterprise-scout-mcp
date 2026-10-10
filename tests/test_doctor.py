@@ -34,6 +34,8 @@ def test_doctor_report_keys() -> None:
     assert arch["captcha_branch"]["strategy"] == "rotate_ip"
     assert report["tiers"]["equity"]["implemented"] is True
     assert report["tiers"]["l3"]["implemented"] is True
+    assert "corpus" in report
+    assert "l3" in report["corpus"]
     assert arch["phase2"]["credit"] is True
 
 

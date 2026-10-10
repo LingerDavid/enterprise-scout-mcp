@@ -325,6 +325,27 @@ def cmd_smoke_registry_l1(args: argparse.Namespace) -> int:
         scheduler.close()
 
 
+def cmd_corpus_status(args: argparse.Namespace) -> int:
+    from enterprise_scout_mcp.config import resolve_project_root
+    from enterprise_scout_mcp.integrations.corpus_lookup import corpus_dir_stats
+
+    config = load_config(args.config)
+    root = resolve_project_root()
+    corpus = config.integrations.corpus
+
+    def _dir(rel: str) -> Path:
+        p = Path(rel)
+        return p if p.is_absolute() else root / p
+
+    report = {
+        "enabled": corpus.enabled,
+        "l3": corpus_dir_stats(_dir(corpus.l3_dir)),
+        "judicial": corpus_dir_stats(_dir(corpus.judicial_dir)),
+    }
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_drain_retry(args: argparse.Namespace) -> int:
     from enterprise_scout_mcp.retry import drain_retry_queue
 
@@ -456,6 +477,11 @@ def build_parser() -> argparse.ArgumentParser:
     smoke_l1.add_argument("keyword", nargs="?", default="苏州挚途")
     smoke_l1.add_argument("--persona", default=None)
     smoke_l1.set_defaults(func=cmd_smoke_registry_l1)
+
+    corpus = sub.add_parser("corpus", help="L3 / judicial local corpus status")
+    corpus_sub = corpus.add_subparsers(dest="corpus_cmd", required=True)
+    corpus_status = corpus_sub.add_parser("status", help="Show corpus dirs and file counts")
+    corpus_status.set_defaults(func=cmd_corpus_status, corpus_cmd="status")
 
     drain = sub.add_parser("drain-retry", help="Re-run jobs from raw/retry_queue")
     drain.add_argument("--limit", type=int, default=0, help="Max jobs (0 = all)")
