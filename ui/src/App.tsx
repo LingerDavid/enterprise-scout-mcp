@@ -5,7 +5,7 @@ import { AiqichaPage } from "./pages/AiqichaPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { StatusPage } from "./pages/StatusPage";
 
-type SettingsSection = "global" | "warehouse" | "neo4j" | "channels";
+type SettingsSection = "global" | "warehouse" | "neo4j" | "channels" | "sessions";
 
 export default function App() {
   const [page, setPage] = useState<PageId>("aiqicha");
@@ -18,6 +18,7 @@ export default function App() {
   const [warehouse, setWarehouse] = useState<Record<string, unknown> | null>(null);
   const [verify, setVerify] = useState<Record<string, unknown> | null>(null);
   const [neo4jProbe, setNeo4jProbe] = useState<Record<string, unknown> | null>(null);
+  const [sessions, setSessions] = useState<Record<string, unknown> | null>(null);
 
   const [keyword, setKeyword] = useState("");
   const [platform, setPlatform] = useState("aiqicha");
@@ -29,18 +30,20 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
-      const [health, d, w, v, n] = await Promise.all([
+      const [health, d, w, v, n, sess] = await Promise.all([
         api.health(),
         api.doctor(false),
         api.warehouse(),
         api.verify(),
         api.neo4jProbe(),
+        api.sessions(),
       ]);
       setBackendOk(Boolean(health.ok));
       setDoctor(d);
       setWarehouse(w);
       setVerify(v);
       setNeo4jProbe(n);
+      setSessions(sess.sessions ?? sess);
     } catch (e) {
       setBackendOk(false);
       setError(e instanceof Error ? e.message : String(e));
@@ -100,6 +103,7 @@ export default function App() {
             warehouse={warehouse}
             doctor={doctor}
             neo4jProbe={neo4jProbe}
+            sessions={sessions}
             loading={loading}
             onRefresh={() => void refreshMeta()}
             onNeo4jImport={(dry) => void runNeo4jImport(dry)}

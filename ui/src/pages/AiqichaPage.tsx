@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
 import type { CollectResult } from "../api";
 import { DataTable } from "../components/DataTable";
+import { ExportModal } from "../components/ExportModal";
+import { HoldingTree } from "../components/HoldingTree";
 import { StatusPill } from "../components/StatusPill";
+import { buildHoldingTree } from "../lib/equityTree";
 import {
   buildResultTabs,
   companyTitle,
@@ -39,11 +42,13 @@ export function AiqichaPage({
   onSearch,
 }: Props) {
   const [tab, setTab] = useState("basic");
+  const [exportOpen, setExportOpen] = useState(false);
   const info = useMemo(() => firstInfo(result?.data ?? null), [result]);
   const title = companyTitle(info, keyword);
   const tabs = useMemo(() => buildResultTabs(result), [result]);
   const { holders } = useMemo(() => equityRows(result), [result]);
   const strip = useMemo(() => topHoldersForStrip(holders), [holders]);
+  const treeNodes = useMemo(() => buildHoldingTree(result, title), [result, title]);
   const active = tabs.find((t) => t.id === tab) ?? tabs[0];
 
   return (
@@ -108,7 +113,16 @@ export function AiqichaPage({
                 {result.message ? <span>{result.message}</span> : null}
               </div>
             </div>
-            <StatusPill grade={result.grade} />
+            <div className="btn-row">
+              <button type="button" className="btn btn-primary" onClick={() => setExportOpen(true)}>
+                导出控股树
+              </button>
+              <StatusPill grade={result.grade} />
+            </div>
+          </div>
+
+          <div className="card-body tree-panel">
+            <HoldingTree nodes={treeNodes} companyName={title} />
           </div>
 
           {strip.length ? (
@@ -154,6 +168,15 @@ export function AiqichaPage({
           </div>
         </section>
       )}
+
+      {result ? (
+        <ExportModal
+          open={exportOpen}
+          result={result}
+          keyword={keyword}
+          onClose={() => setExportOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

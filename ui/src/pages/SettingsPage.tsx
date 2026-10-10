@@ -1,6 +1,13 @@
 import { BoolPill } from "../components/StatusPill";
 
-type SettingsSection = "global" | "warehouse" | "neo4j" | "channels";
+type SettingsSection = "global" | "warehouse" | "neo4j" | "channels" | "sessions";
+
+type SessionItem = {
+  name?: string;
+  path?: string;
+  ready?: boolean;
+  label?: string;
+};
 
 type Props = {
   section: SettingsSection;
@@ -8,6 +15,7 @@ type Props = {
   warehouse: Record<string, unknown> | null;
   doctor: Record<string, unknown> | null;
   neo4jProbe: Record<string, unknown> | null;
+  sessions: Record<string, unknown> | null;
   loading: boolean;
   onRefresh: () => void;
   onNeo4jImport: (dryRun: boolean) => void;
@@ -15,6 +23,7 @@ type Props = {
 
 const SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: "global", label: "全局设置" },
+  { id: "sessions", label: "Cookie / Session" },
   { id: "warehouse", label: "数据仓库" },
   { id: "neo4j", label: "Neo4j" },
   { id: "channels", label: "采集通道" },
@@ -26,10 +35,12 @@ export function SettingsPage({
   warehouse,
   doctor,
   neo4jProbe,
+  sessions,
   loading,
   onRefresh,
   onNeo4jImport,
 }: Props) {
+  const sessionItems = (sessions?.items ?? []) as SessionItem[];
   const whCounts = (warehouse?.counts ?? {}) as Record<string, number>;
   const neo4j = (doctor?.neo4j ?? {}) as Record<string, unknown>;
   const tiers = (doctor?.tiers ?? {}) as Record<string, Record<string, unknown>>;
@@ -78,6 +89,45 @@ export function SettingsPage({
                   <input readOnly value="registry,equity" />
                   <div className="form-hint">可在爱企查页自定义 dims 参数</div>
                 </div>
+              </div>
+            </section>
+          ) : null}
+
+          {section === "sessions" ? (
+            <section className="card">
+              <div className="card-header">
+                <h3>Cookie / Session</h3>
+              </div>
+              <div className="card-body">
+                <div className="form-row">
+                  <label>目录</label>
+                  <input readOnly value={String(sessions?.sessions_dir ?? "-")} />
+                </div>
+                <div className="table-wrap" style={{ marginTop: "0.75rem" }}>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>槽位</th>
+                        <th>状态</th>
+                        <th>路径</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sessionItems.map((s) => (
+                        <tr key={String(s.name)}>
+                          <td>{s.label ?? s.name}</td>
+                          <td><BoolPill ok={Boolean(s.ready)} yes="就绪" no="缺失" /></td>
+                          <td>{s.path}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="form-hint" style={{ marginTop: "0.75rem" }}>
+                  导入：escout sessions import gsxt --from-file cookies.json
+                  <br />
+                  escout sessions import aiqicha --from-file aiqicha_cookies.txt
+                </p>
               </div>
             </section>
           ) : null}
