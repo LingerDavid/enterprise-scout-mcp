@@ -29,3 +29,8 @@ def test_channel_for_equity_l2_enscan():
 
 def test_channel_for_l3_academic():
     assert channel_for(Dimension.REGISTRY, SourceTier.L3) == ChannelKind.ACADEMIC_L3
+
+
+def test_channel_for_credit_handaas():
+    assert channel_for(Dimension.CREDIT, SourceTier.L2, handaas_available=True) == ChannelKind.HANDAAS_API
+    assert channel_for(Dimension.CREDIT, SourceTier.L2, handaas_available=False) == ChannelKind.DEFERRED

@@ -75,8 +75,10 @@ def build_doctor_report(
             },
             "credit": {
                 "implemented": True,
-                "channel": ChannelKind.DEFERRED.value,
-                "note": "stub; enable handaas for paid complement",
+                "channel": ChannelKind.HANDAAS_API.value
+                if scheduler._channels[ChannelKind.HANDAAS_API].available()
+                else ChannelKind.DEFERRED.value,
+                "note": "Handaas base_info when credentials set; else deferred stub",
             },
             "judicial": {
                 "implemented": True,

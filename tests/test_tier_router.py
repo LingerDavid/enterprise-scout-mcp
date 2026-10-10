@@ -52,7 +52,7 @@ def test_tier_router_equity_routes_enscan_l2():
     assert decision.dimension == Dimension.EQUITY
 
 
-def test_tier_router_credit_deferred():
+def test_tier_router_credit_deferred_without_handaas():
     router = TierAwareRouter(RoutingConfig())
     task = CollectTask(
         keyword="x",
@@ -60,8 +60,21 @@ def test_tier_router_credit_deferred():
         dimensions=(Dimension.CREDIT,),
         prefer_tier=SourceTier.L2,
     )
-    decision = router.select(task, gsxt_available=True, ensan_available=True)
+    decision = router.select(task, gsxt_available=True, ensan_available=True, handaas_available=False)
     assert decision.channel == ChannelKind.DEFERRED
+    assert decision.dimension == Dimension.CREDIT
+
+
+def test_tier_router_credit_handaas_when_available():
+    router = TierAwareRouter(RoutingConfig())
+    task = CollectTask(
+        keyword="x",
+        platform=Platform.GSXT,
+        dimensions=(Dimension.CREDIT,),
+        prefer_tier=SourceTier.L2,
+    )
+    decision = router.select(task, gsxt_available=True, ensan_available=True, handaas_available=True)
+    assert decision.channel == ChannelKind.HANDAAS_API
     assert decision.dimension == Dimension.CREDIT
 
 

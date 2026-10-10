@@ -35,10 +35,17 @@ def is_stub_dimension(dimension: Dimension) -> bool:
     return dimension in _STUB_DIMENSIONS
 
 
-def channel_for(dimension: Dimension, tier: SourceTier) -> ChannelKind:
+def channel_for(
+    dimension: Dimension,
+    tier: SourceTier,
+    *,
+    handaas_available: bool = False,
+) -> ChannelKind:
     if tier == SourceTier.L3:
         return ChannelKind.ACADEMIC_L3
     if is_stub_dimension(dimension):
+        if handaas_available and dimension == Dimension.CREDIT:
+            return ChannelKind.HANDAAS_API
         return ChannelKind.DEFERRED
     if dimension == Dimension.REGISTRY and tier == SourceTier.L1:
         return ChannelKind.GSXT_OFFICIAL

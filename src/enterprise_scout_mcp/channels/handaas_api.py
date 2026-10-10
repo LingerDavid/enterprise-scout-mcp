@@ -12,6 +12,7 @@ from enterprise_scout_mcp.models import (
     ChannelKind,
     CollectResult,
     CollectTask,
+    Dimension,
     PersonaProfile,
     Platform,
     ResultGrade,
@@ -53,6 +54,16 @@ class HandaasChannel(CollectionChannel):
         body = r.json()
         return body.get("data") or body.get("msgCN") or body
 
+    def _product_for(self, task: CollectTask) -> tuple[str, dict]:
+        dim = task.primary_dimension
+        if dim == Dimension.CREDIT:
+            return "enterprise_get_enterprise_base_info", {"keyword": task.keyword}
+        if dim == Dimension.JUDICIAL:
+            raise ValueError("judicial product not in Handaas catalog")
+        if task.depth == 0:
+            return "enterprise_get_keyword_search", {"matchKeyword": task.keyword, "pageSize": 10}
+        return "enterprise_get_enterprise_base_info", {"keyword": task.keyword}
+
     def collect(
         self,
         task: CollectTask,
@@ -61,29 +72,40 @@ class HandaasChannel(CollectionChannel):
         egress: EgressContext | None = None,
     ) -> CollectResult:
         _ = egress
-        if task.platform != Platform.HANDAAS:
+        dim = task.primary_dimension
+        if task.platform != Platform.HANDAAS and dim not in (Dimension.CREDIT, Dimension.JUDICIAL):
             return CollectResult(
                 task=task,
                 channel=ChannelKind.HANDAAS_API,
                 grade=ResultGrade.ERROR,
-                message="Handaas channel requires platform=handaas",
+                message="Handaas channel requires platform=handaas or credit/judicial dimension",
                 persona_id=persona.id,
             )
         try:
-            if task.depth == 0:
-                product_id = "enterprise_get_keyword_search"
-                params = {"matchKeyword": task.keyword, "pageSize": 10}
-            else:
-                product_id = "enterprise_get_enterprise_base_info"
-                params = {"keyword": task.keyword}
+            product_id, params = self._product_for(task)
             data = self._call(product_id, params)
             grade = ResultGrade.OK if data else ResultGrade.PARTIAL
+            payload = data if isinstance(data, dict) else {"raw": data}
+            if dim == Dimension.CREDIT and isinstance(payload, dict):
+                payload = {"credit_profile": payload, "dimension": dim.value}
             return CollectResult(
                 task=task,
                 channel=ChannelKind.HANDAAS_API,
                 grade=grade,
-                data=data if isinstance(data, dict) else {"raw": data},
+                data=payload,
+                message="handaas credit complement" if dim == Dimension.CREDIT else "",
                 persona_id=persona.id,
+                dimension=dim if dim in (Dimension.CREDIT, Dimension.JUDICIAL) else None,
+            )
+        except ValueError as exc:
+            return CollectResult(
+                task=task,
+                channel=ChannelKind.HANDAAS_API,
+                grade=ResultGrade.PARTIAL,
+                data={"stub": True, "dimension": dim.value},
+                message=str(exc),
+                persona_id=persona.id,
+                dimension=dim,
             )
         except httpx.HTTPError as exc:
             return CollectResult(

@@ -164,6 +164,7 @@ class CollectorScheduler:
             task,
             gsxt_available=self._channels[ChannelKind.GSXT_OFFICIAL].available(),
             ensan_available=self._channels[ChannelKind.ENSCAN_GO].available(),
+            handaas_available=self._channels[ChannelKind.HANDAAS_API].available(),
         )
 
     def _select_channel(self, task: CollectTask) -> ChannelKind:

@@ -22,6 +22,41 @@ def _load_fetch_module():
     return mod
 
 
+def fetch_camoufox(
+    keyword: str,
+    timeout: float,
+    *,
+    proxy: str = "",
+    headless: bool = True,
+) -> tuple[str, list[dict[str, str]]]:
+    mod = _load_fetch_module()
+    try:
+        from enterprise_scout_mcp.integrations.camoufox_fetch import (
+            classify_aiqicha_html,
+            fetch_html_camoufox,
+        )
+    except ImportError:
+        # Script invoked outside installed package — load sibling module by path
+        import sys
+
+        root = Path(__file__).resolve().parents[1] / "src"
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
+        from enterprise_scout_mcp.integrations.camoufox_fetch import (
+            classify_aiqicha_html,
+            fetch_html_camoufox,
+        )
+
+    url = f"https://www.aiqicha.com/s?q={urllib.parse.quote(keyword)}&t=0"
+    html = fetch_html_camoufox(
+        url,
+        headless=headless,
+        wait_seconds=min(timeout, 12.0),
+        proxy_url=proxy or None,
+    )
+    return classify_aiqicha_html(html, mod.extract_companies)
+
+
 async def fetch_nodriver(
     keyword: str,
     cookie_file: Path | None,
@@ -67,36 +102,34 @@ def main() -> int:
     p.add_argument("--accept-language", default="")
     args = p.parse_args()
 
-    if args.browser_backend == "camoufox":
-        print(
-            json.dumps(
-                {
-                    "status": "error",
-                    "message": "camoufox backend accepted; wire fetch in script or use nodriver",
-                    "source": "camoufox",
-                }
-            )
-        )
-        return 1
-
     mod = _load_fetch_module()
     args.db.parent.mkdir(parents=True, exist_ok=True)
     mod.ensure_db(args.db)
 
+    source = "aiqicha_fetch_nodriver"
     try:
-        status, companies = asyncio.run(
-            fetch_nodriver(args.keyword, args.cookie_file, args.user_data_dir, args.timeout)
-        )
+        if args.browser_backend == "camoufox":
+            source = "aiqicha_fetch_camoufox"
+            status, companies = fetch_camoufox(
+                args.keyword,
+                args.timeout,
+                proxy=args.proxy,
+                headless=True,
+            )
+        else:
+            status, companies = asyncio.run(
+                fetch_nodriver(args.keyword, args.cookie_file, args.user_data_dir, args.timeout)
+            )
     except RuntimeError as exc:
-        print(json.dumps({"status": "error", "message": str(exc), "source": "nodriver"}))
+        print(json.dumps({"status": "error", "message": str(exc), "source": source}))
         return 1
 
     best = companies[0] if companies else None
     if best:
         mod.upsert(args.db, best)
-        payload = {"status": status, "company": best, "source": "aiqicha_fetch_nodriver"}
+        payload = {"status": status, "company": best, "source": source}
     else:
-        payload = {"status": status, "company": None, "source": "aiqicha_fetch_nodriver"}
+        payload = {"status": status, "company": None, "source": source}
 
     print(json.dumps(payload, ensure_ascii=False))
     return 0 if status == "ok" else 1

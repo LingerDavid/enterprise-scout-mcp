@@ -28,6 +28,7 @@ class TierAwareRouter:
         *,
         gsxt_available: bool,
         ensan_available: bool,
+        handaas_available: bool = False,
     ) -> RouteDecision:
         if task.force_channel:
             tier = SourceTier.L2 if task.force_channel == ChannelKind.ENSCAN_GO else SourceTier.L1
@@ -44,14 +45,21 @@ class TierAwareRouter:
                 dimension=dim,
             )
 
-        if is_stub_dimension(dim):
+        channel = channel_for(dim, tier, handaas_available=handaas_available)
+        if channel == ChannelKind.DEFERRED:
             return RouteDecision(
                 channel=ChannelKind.DEFERRED,
                 source_tier=SourceTier.L2,
                 dimension=dim,
             )
-
-        channel = channel_for(dim, tier)
+        if channel == ChannelKind.HANDAAS_API:
+            if not handaas_available:
+                raise RuntimeError(f"Handaas unavailable for dimension {dim.value!r}")
+            return RouteDecision(
+                channel=ChannelKind.HANDAAS_API,
+                source_tier=SourceTier.L2,
+                dimension=dim,
+            )
 
         if channel == ChannelKind.GSXT_OFFICIAL:
             if not gsxt_available and not self._config.gsxt_allow_unavailable:
