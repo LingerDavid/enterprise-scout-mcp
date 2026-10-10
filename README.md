@@ -165,7 +165,8 @@ escout import-neo4j        # Company / HOLDS / Supplement / Conflict
 **Phase 3 — Fine UI**（参考 `E:/Project/fine-2.7.2/README_images`：设置 + 爱企查 + 多 Tab）：
 
 ```powershell
-pip install -e ".[ui]"
+# 首次（或 venv 损坏时）
+.\setup-venv.ps1 -Ui
 
 # 推荐：不依赖 PATH 里的 escout
 .\serve-ui.ps1             # 自动 build ui/dist + API :8790

@@ -22,8 +22,12 @@ function Get-VenvPython {
 .venv not found at $Root\.venv
 Create it:
   cd $Root
-  python -m venv .venv
-  .\.venv\Scripts\pip install -e ".[ui,graph,warehouse]"
+  .\setup-venv.ps1 -Ui
+
+If 'Unable to copy venvlauncher.exe': .venv already exists or escout is running.
+  .\serve-ui.ps1 -SkipBuild    # use existing venv
+  # or stop serve, then:
+  .\setup-venv.ps1 -Force -Ui
 "@
 }
 
