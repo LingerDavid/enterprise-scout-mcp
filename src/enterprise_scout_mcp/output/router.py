@@ -10,6 +10,7 @@ from enterprise_scout_mcp.config import OutputConfig
 from enterprise_scout_mcp.models import CollectResult, ResultGrade
 from enterprise_scout_mcp.output.conflict_writer import append_conflicts
 from enterprise_scout_mcp.output.edge_writer import append_edges
+from enterprise_scout_mcp.output.corpus_writer import append_corpus_supplement
 from enterprise_scout_mcp.output.parquet_writer import append_entity
 
 
@@ -54,6 +55,7 @@ class OutputRouter:
             wh = Path(self._config.warehouse_dir)
             append_entity(result, wh)
             append_edges(result, wh)
+            append_corpus_supplement(result, wh)
         return path
 
     def persist_conflicts(self, rows: list, _result: CollectResult) -> Path | None:

@@ -325,6 +325,27 @@ def cmd_smoke_registry_l1(args: argparse.Namespace) -> int:
         scheduler.close()
 
 
+def cmd_corpus_init(args: argparse.Namespace) -> int:
+    from enterprise_scout_mcp.config import resolve_project_root
+    from enterprise_scout_mcp.integrations.corpus_init import init_corpus_dirs
+
+    config = load_config(args.config)
+    root = resolve_project_root()
+    corpus = config.integrations.corpus
+
+    def _dir(rel: str) -> Path:
+        p = Path(rel)
+        return p if p.is_absolute() else root / p
+
+    report = init_corpus_dirs(
+        _dir(corpus.l3_dir),
+        _dir(corpus.judicial_dir),
+        write_samples=not args.no_samples,
+    )
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_corpus_status(args: argparse.Namespace) -> int:
     from enterprise_scout_mcp.config import resolve_project_root
     from enterprise_scout_mcp.integrations.corpus_lookup import corpus_dir_stats
@@ -482,6 +503,9 @@ def build_parser() -> argparse.ArgumentParser:
     corpus_sub = corpus.add_subparsers(dest="corpus_cmd", required=True)
     corpus_status = corpus_sub.add_parser("status", help="Show corpus dirs and file counts")
     corpus_status.set_defaults(func=cmd_corpus_status, corpus_cmd="status")
+    corpus_init = corpus_sub.add_parser("init", help="Create corpus dirs and example JSONL")
+    corpus_init.add_argument("--no-samples", action="store_true", help="Skip writing _example.jsonl")
+    corpus_init.set_defaults(func=cmd_corpus_init, corpus_cmd="init")
 
     drain = sub.add_parser("drain-retry", help="Re-run jobs from raw/retry_queue")
     drain.add_argument("--limit", type=int, default=0, help="Max jobs (0 = all)")

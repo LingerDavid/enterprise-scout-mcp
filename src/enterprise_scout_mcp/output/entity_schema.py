@@ -69,11 +69,23 @@ def _pick(sources: list[dict[str, Any]], keys: tuple[str, ...]) -> str:
     return ""
 
 
+def _corpus_record(data: dict[str, Any]) -> dict[str, Any]:
+    for key in ("academic", "judicial", "credit_profile"):
+        block = data.get(key)
+        if isinstance(block, dict):
+            return block
+    corpus = data.get("corpus")
+    if isinstance(corpus, dict) and isinstance(corpus.get("record"), dict):
+        return corpus["record"]
+    return {}
+
+
 def entity_row(result: CollectResult) -> dict[str, Any]:
     """Normalize collect result to EnterpriseLake entities/part.parquet columns."""
     data = result.data or {}
     nested = _first_info(data) if isinstance(data, dict) else {}
-    sources = [data, nested] if isinstance(data, dict) else [nested]
+    corpus_rec = _corpus_record(data) if isinstance(data, dict) else {}
+    sources = [s for s in (data, nested, corpus_rec) if isinstance(s, dict) and s]
 
     name = _pick(sources, _NAME_KEYS) or result.task.keyword
     former = _pick(sources, _FORMER_KEYS)

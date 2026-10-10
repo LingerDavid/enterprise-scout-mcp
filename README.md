@@ -90,6 +90,7 @@ escout collect 苏州挚途 --dims registry --prefer-tier l1 -p gsxt
 escout smoke-registry-l1 苏州挚途                  # L1 registry 穿通验收
 escout drain-retry --dry-run    # 列出 retry_queue 待重跑任务
 escout drain-retry --limit 20   # 重跑 captcha 队列（成功 → .archive）
+escout corpus init              # 创建语料目录 + 示例 JSONL
 escout corpus status            # L3 / judicial 语料目录状态
 ```
 

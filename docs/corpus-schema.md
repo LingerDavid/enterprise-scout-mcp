@@ -50,6 +50,7 @@ Nested `payload` objects are searched recursively.
 ```powershell
 escout collect 苏州挚途 --prefer-tier l3 --dims registry
 escout collect 苏州挚途 --dims judicial
+escout corpus init
 escout corpus status
 ```
 

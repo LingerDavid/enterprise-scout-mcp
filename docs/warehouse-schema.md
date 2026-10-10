@@ -42,6 +42,27 @@ Written when tiered L1→L2 fallback finds mismatched registry identity fields.
 | `collected_at` | string | UTC ISO-8601 |
 | `message` | string | Conflict summary |
 
+## supplements/{l3,judicial}/part.parquet
+
+Written when L3 academic or judicial corpus lookup returns `ok` / `partial` with a hit (`data.academic` or `data.judicial`).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `query_keyword` | string | Original search keyword |
+| `dimension` | string | `registry`, `judicial`, … |
+| `source_tier` | string | `l3` or `l2` |
+| `source_channel` | string | `academic_l3` or `deferred` |
+| `corpus_file` | string | Source JSONL/JSON filename |
+| `grade` | string | `ok` or `partial` |
+| `persona_id` | string | Persona used |
+| `collected_at` | string | UTC ISO-8601 |
+| `payload_json` | string | Corpus record body |
+| `message` | string | Channel message |
+
+Corpus hits also append a row to `entities/part.parquet` (name/credit_code from corpus record when present).
+
+Initialize corpus dirs: `escout corpus init`.
+
 ## edges/equity/part.parquet
 
 Extracted from ENScan-style nested sections: `partner` / `stockholder` / `holder` (股东→`holder`), `invest` / `holds` (投资/控股→`invest`), `branch`. ENScan 统一导出键为 `name` + `scale`（见 ENSMapLN）。
