@@ -325,6 +325,15 @@ def cmd_smoke_registry_l1(args: argparse.Namespace) -> int:
         scheduler.close()
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    from enterprise_scout_mcp.http.serve import main as serve_main
+
+    argv = ["--host", args.host, "--port", str(args.port)]
+    if args.config:
+        argv.extend(["--config", args.config])
+    return serve_main(argv)
+
+
 def cmd_verify(args: argparse.Namespace) -> int:
     from enterprise_scout_mcp.diagnostics.verify import build_verify_report
 
@@ -455,9 +464,14 @@ def build_parser() -> argparse.ArgumentParser:
     neo4j.add_argument("--dry-run", action="store_true")
     neo4j.set_defaults(func=cmd_import_neo4j)
 
-    verify = sub.add_parser("verify", help="Architecture backend checklist (excludes Fine UI)")
+    verify = sub.add_parser("verify", help="Architecture backend checklist (includes Fine UI scaffold)")
     verify.add_argument("--summary", action="store_true", help="Print checks only, omit full doctor")
     verify.set_defaults(func=cmd_verify)
+
+    serve = sub.add_parser("serve", help="Fine UI HTTP server (API + optional ui/dist)")
+    serve.add_argument("--host", default="127.0.0.1")
+    serve.add_argument("--port", type=int, default=8790)
+    serve.set_defaults(func=cmd_serve)
 
     doctor = sub.add_parser("doctor", help="Check integration availability")
     doctor.add_argument(

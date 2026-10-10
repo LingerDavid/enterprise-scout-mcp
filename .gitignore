@@ -15,3 +15,5 @@ nodriver_data/
 .state/gsxt_nodriver_data/
 .state/session_exports/
 G:/
+ui/node_modules/
+ui/dist/

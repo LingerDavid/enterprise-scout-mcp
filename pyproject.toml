@@ -35,6 +35,10 @@ graph = [
     "neo4j>=5.28.0,<6",
     "pyarrow>=18.0.0,<22",
 ]
+ui = [
+    "fastapi>=0.115.0,<1",
+    "uvicorn[standard]>=0.32.0,<1",
+]
 dev = [
     "pytest>=8.3.0,<9",
     "pyarrow>=18.0.0,<22",
