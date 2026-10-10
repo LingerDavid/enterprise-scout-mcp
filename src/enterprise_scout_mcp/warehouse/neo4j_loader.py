@@ -1,4 +1,4 @@
-"""Load warehouse parquet into Neo4j (Company + HOLDS edges)."""
+"""Load warehouse parquet into Neo4j (Company + HOLDS + Supplement + Conflict)."""
 
 from __future__ import annotations
 
@@ -26,6 +26,21 @@ def parse_percent(ratio: str) -> float | None:
     return val if val <= 100 else None
 
 
+def supplement_id(row: dict[str, Any]) -> str:
+    keyword = str(row.get("query_keyword", "")).strip()
+    dimension = str(row.get("dimension", "")).strip()
+    corpus_file = str(row.get("corpus_file", "")).strip()
+    collected_at = str(row.get("collected_at", "")).strip()
+    return "|".join(p for p in (keyword, dimension, corpus_file, collected_at) if p) or keyword
+
+
+def conflict_id(row: dict[str, Any]) -> str:
+    keyword = str(row.get("query_keyword", "")).strip()
+    field = str(row.get("field", "")).strip()
+    collected_at = str(row.get("collected_at", "")).strip()
+    return "|".join(p for p in (keyword, field, collected_at) if p) or keyword
+
+
 @dataclass
 class ImportStats:
     entities_merged: int = 0
@@ -33,6 +48,7 @@ class ImportStats:
     branches_merged: int = 0
     skipped_edges: int = 0
     supplements_merged: int = 0
+    conflicts_merged: int = 0
 
     def to_dict(self) -> dict[str, int]:
         return {
@@ -41,15 +57,8 @@ class ImportStats:
             "branches_merged": self.branches_merged,
             "skipped_edges": self.skipped_edges,
             "supplements_merged": self.supplements_merged,
+            "conflicts_merged": self.conflicts_merged,
         }
-
-
-def supplement_id(row: dict[str, Any]) -> str:
-    keyword = str(row.get("query_keyword", "")).strip()
-    dimension = str(row.get("dimension", "")).strip()
-    corpus_file = str(row.get("corpus_file", "")).strip()
-    collected_at = str(row.get("collected_at", "")).strip()
-    return "|".join(p for p in (keyword, dimension, corpus_file, collected_at) if p) or keyword
 
 
 def _supplement_paths(warehouse_dir: Path) -> list[Path]:
@@ -68,6 +77,31 @@ def _read_parquet(path: Path) -> list[dict[str, Any]]:
     return pq.read_table(path).to_pylist()
 
 
+def _keyword_company_index(entities: list[dict[str, Any]]) -> dict[str, str]:
+    """Map query_keyword → preferred Company.id (credit_code / entity_id / name)."""
+    index: dict[str, str] = {}
+    for row in entities:
+        keyword = str(row.get("query_keyword", "")).strip()
+        if not keyword:
+            continue
+        cid = company_id(
+            str(row.get("credit_code", "") or row.get("entity_id", "")),
+            str(row.get("name", "") or keyword),
+        )
+        if cid:
+            index[keyword] = cid
+    return index
+
+
+def _ensure_constraints(session: Any) -> None:
+    for cypher in (
+        "CREATE CONSTRAINT company_id IF NOT EXISTS FOR (c:Company) REQUIRE c.id IS UNIQUE",
+        "CREATE CONSTRAINT supplement_id IF NOT EXISTS FOR (s:Supplement) REQUIRE s.id IS UNIQUE",
+        "CREATE CONSTRAINT conflict_id IF NOT EXISTS FOR (x:Conflict) REQUIRE x.id IS UNIQUE",
+    ):
+        session.run(cypher)
+
+
 def import_warehouse(
     warehouse_dir: Path,
     *,
@@ -79,6 +113,7 @@ def import_warehouse(
     stats = ImportStats()
     entities = _read_parquet(warehouse_dir / "entities" / "part.parquet")
     edges = _read_parquet(warehouse_dir / "edges" / "equity" / "part.parquet")
+    conflicts = _read_parquet(warehouse_dir / "conflicts" / "part.parquet")
     supplements: list[dict[str, Any]] = []
     for path in _supplement_paths(warehouse_dir):
         supplements.extend(_read_parquet(path))
@@ -88,15 +123,22 @@ def import_warehouse(
         stats.holds_merged = sum(1 for e in edges if e.get("relation") in ("invest", "holder"))
         stats.branches_merged = sum(1 for e in edges if e.get("relation") == "branch")
         stats.supplements_merged = len(supplements)
+        stats.conflicts_merged = len(conflicts)
         return stats
 
     from neo4j import GraphDatabase
 
+    keyword_index = _keyword_company_index(entities)
     driver = GraphDatabase.driver(uri, auth=(user, password))
     try:
         with driver.session() as session:
+            _ensure_constraints(session)
+
             for row in entities:
-                cid = company_id(str(row.get("entity_id", "")), str(row.get("name", "")))
+                cid = company_id(
+                    str(row.get("credit_code", "") or row.get("entity_id", "")),
+                    str(row.get("name", "")),
+                )
                 if not cid:
                     continue
                 session.run(
@@ -104,19 +146,31 @@ def import_warehouse(
                     MERGE (c:Company {id: $id})
                     SET c.name = $name,
                         c.former_name = $former_name,
+                        c.credit_code = $credit_code,
+                        c.entity_id = $entity_id,
                         c.platform = $platform,
                         c.source_channel = $source_channel,
+                        c.source_tier = $source_tier,
+                        c.dimension = $dimension,
                         c.query_keyword = $query_keyword,
                         c.grade = $grade,
+                        c.persona_id = $persona_id,
+                        c.degraded = $degraded,
                         c.collected_at = $collected_at
                     """,
                     id=cid,
                     name=str(row.get("name", "")),
                     former_name=str(row.get("former_name", "")),
+                    credit_code=str(row.get("credit_code", "")),
+                    entity_id=str(row.get("entity_id", "")),
                     platform=str(row.get("platform", "")),
                     source_channel=str(row.get("source_channel", "")),
+                    source_tier=str(row.get("source_tier", "")),
+                    dimension=str(row.get("dimension", "")),
                     query_keyword=str(row.get("query_keyword", "")),
                     grade=str(row.get("grade", "")),
+                    persona_id=str(row.get("persona_id", "")),
+                    degraded=bool(row.get("degraded", False)),
                     collected_at=str(row.get("collected_at", "")),
                 )
                 stats.entities_merged += 1
@@ -176,7 +230,7 @@ def import_warehouse(
                 keyword = str(row.get("query_keyword", "")).strip()
                 if not keyword:
                     continue
-                cid = company_id("", keyword)
+                cid = keyword_index.get(keyword) or company_id("", keyword)
                 sid = supplement_id(row)
                 if not sid:
                     continue
@@ -216,6 +270,54 @@ def import_warehouse(
                     message=str(row.get("message", "")),
                 )
                 stats.supplements_merged += 1
+
+            for row in conflicts:
+                keyword = str(row.get("query_keyword", "")).strip()
+                if not keyword:
+                    continue
+                cid = keyword_index.get(keyword) or company_id("", keyword)
+                xid = conflict_id(row)
+                if not xid:
+                    continue
+                session.run(
+                    "MERGE (c:Company {id: $id}) SET c.name = coalesce(c.name, $name)",
+                    id=cid,
+                    name=keyword,
+                )
+                session.run(
+                    """
+                    MERGE (x:Conflict {id: $xid})
+                    SET x.query_keyword = $query_keyword,
+                        x.field = $field,
+                        x.l1_value = $l1_value,
+                        x.l2_value = $l2_value,
+                        x.l1_grade = $l1_grade,
+                        x.l2_grade = $l2_grade,
+                        x.l1_channel = $l1_channel,
+                        x.l2_channel = $l2_channel,
+                        x.platform = $platform,
+                        x.collected_at = $collected_at,
+                        x.message = $message
+                    WITH x
+                    MATCH (c:Company {id: $cid})
+                    MERGE (c)-[r:HAS_CONFLICT]->(x)
+                    SET r.field = $field
+                    """,
+                    xid=xid,
+                    cid=cid,
+                    query_keyword=keyword,
+                    field=str(row.get("field", "")),
+                    l1_value=str(row.get("l1_value", "")),
+                    l2_value=str(row.get("l2_value", "")),
+                    l1_grade=str(row.get("l1_grade", "")),
+                    l2_grade=str(row.get("l2_grade", "")),
+                    l1_channel=str(row.get("l1_channel", "")),
+                    l2_channel=str(row.get("l2_channel", "")),
+                    platform=str(row.get("platform", "")),
+                    collected_at=str(row.get("collected_at", "")),
+                    message=str(row.get("message", "")),
+                )
+                stats.conflicts_merged += 1
     finally:
         driver.close()
     return stats

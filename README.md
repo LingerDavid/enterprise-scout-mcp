@@ -154,13 +154,20 @@ MCP (enterprise-scout-mcp)
 
 模块落地状态见 `escout doctor` → `architecture` / `tiers`。
 
+**Neo4j 收敛（UI 前）：**
+
+```powershell
+escout doctor              # warehouse.counts + neo4j.connectivity（enabled 时）
+escout import-neo4j --dry-run
+escout import-neo4j        # Company / HOLDS / Supplement / Conflict
+```
+
 **后端验收（Fine UI 最后做）：**
 
 ```powershell
 escout verify --summary   # 架构模块 checklist（fine_ui 预期 false）
-pytest -q                 # 125+ tests
+pytest -q
 escout corpus init
-escout import-neo4j --dry-run
 ```
 
 **Phase 3 — Fine UI（未开始）：** 参考 `E:/Project/fine-2.7.2/README_images`（设置页 + 爱企查查询 + 多 Tab 结果），独立前端，接现有 MCP/escout API。

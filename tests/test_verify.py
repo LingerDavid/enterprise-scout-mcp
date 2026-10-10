@@ -15,7 +15,10 @@ def test_verify_report_backend_ok() -> None:
     finally:
         scheduler.close()
     assert report["checks"]["l1_registry"] is True
+    assert report["checks"]["neo4j_warehouse_dry_run"] is True
     assert report["checks"]["neo4j_supplements"] is True
+    assert report["checks"]["neo4j_conflicts"] is True
+    assert report["checks"]["neo4j_model"] is True
     assert report["checks"]["fine_ui"] is False
     assert report["ok"] is True
     assert "fine_ui" in report["failed"] or report["ok"]

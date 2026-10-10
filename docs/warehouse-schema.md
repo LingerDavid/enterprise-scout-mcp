@@ -119,10 +119,18 @@ after successful collect / batch / drain.
 
 Graph model:
 
-- `(:Company {id})-[:HOLDS {percent}]->(:Company)` plus optional `[:BRANCH]`
-- `(:Company)-[:HAS_SUPPLEMENT]->(:Supplement)` for L3 / judicial corpus rows
+- `(:Company {id, credit_code, source_tier, dimension, …})`
+- `(:Company)-[:HOLDS {percent, relation, section}]->(:Company)`
+- `(:Company)-[:BRANCH]->(:Company)`
+- `(:Company)-[:HAS_SUPPLEMENT]->(:Supplement)` — L3 / judicial corpus rows
+- `(:Company)-[:HAS_CONFLICT]->(:Conflict)` — L1/L2 registry field mismatches
+
+Unique constraints on import: `Company.id`, `Supplement.id`, `Conflict.id`.
 
 Penetration queries: `EnterpriseLake/cypher/equity_penetration.cypher`.  
-Supplement queries: `EnterpriseLake/cypher/supplements.cypher`.
+Supplement queries: `EnterpriseLake/cypher/supplements.cypher`.  
+Conflict queries: `EnterpriseLake/cypher/conflicts.cypher`.
+
+Warehouse inventory: `escout doctor` → `warehouse.counts` (dry-run import stats).
 
 Backend verification (no UI): `escout verify --summary`.

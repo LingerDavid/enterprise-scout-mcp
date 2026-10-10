@@ -9,6 +9,7 @@ import pytest
 
 from enterprise_scout_mcp.warehouse.neo4j_loader import (
     company_id,
+    conflict_id,
     import_warehouse,
     parse_percent,
     supplement_id,
@@ -54,6 +55,18 @@ def test_import_warehouse_dry_run(tmp_path: Path) -> None:
     assert stats.holds_merged == 1
 
 
+def test_conflict_id_stable() -> None:
+    cid = conflict_id(
+        {
+            "query_keyword": "Acme",
+            "field": "credit_code",
+            "collected_at": "2026-01-01T00:00:00+00:00",
+        }
+    )
+    assert "Acme" in cid
+    assert "credit_code" in cid
+
+
 def test_supplement_id_stable() -> None:
     sid = supplement_id(
         {
@@ -83,5 +96,14 @@ def test_import_warehouse_dry_run_includes_supplements(tmp_path: Path) -> None:
         ),
         l3 / "part.parquet",
     )
+    conflicts = tmp_path / "conflicts"
+    conflicts.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [{"query_keyword": "Acme", "field": "name", "l1_value": "A", "l2_value": "B"}]
+        ),
+        conflicts / "part.parquet",
+    )
     stats = import_warehouse(tmp_path, uri="", user="", password="", dry_run=True)
     assert stats.supplements_merged == 1
+    assert stats.conflicts_merged == 1

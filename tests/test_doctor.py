@@ -24,7 +24,11 @@ def test_doctor_report_keys() -> None:
     assert "nodriver" in report
     assert "warehouse" in report
     assert "script_exists" in report["nodriver"]
-    assert "entities_exists" in report["warehouse"]
+    assert "files" in report["warehouse"]
+    assert "entities" in report["warehouse"]["files"]
+    assert "counts" in report["warehouse"] or report["warehouse"].get("dry_run_ok") is False
+    assert "driver_installed" in report["neo4j"]
+    assert "Conflict" in report["neo4j"]["model"]
     assert "sidecars" not in report
     arch = report["architecture"]
     assert arch["persona"]["implemented"] is True

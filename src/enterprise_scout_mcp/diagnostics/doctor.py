@@ -13,6 +13,11 @@ from enterprise_scout_mcp.diagnostics.sidecars import build_sidecar_report
 from enterprise_scout_mcp.models import ChannelKind, Dimension
 from enterprise_scout_mcp.scheduler import CollectorScheduler
 from enterprise_scout_mcp.transport.camoufox_backend import camoufox_available
+from enterprise_scout_mcp.warehouse.status import (
+    graph_driver_installed,
+    probe_neo4j,
+    summarize_warehouse,
+)
 
 
 def _resolve(root: Path, rel: str) -> Path:
@@ -36,8 +41,7 @@ def build_doctor_report(
     pw = config.integrations.playwright
     gsxt = config.integrations.gsxt
     wh = Path(config.output.warehouse_dir)
-    entities = wh / "entities" / "part.parquet"
-    edges = wh / "edges" / "equity" / "part.parquet"
+    warehouse_summary = summarize_warehouse(wh)
     session_path = _resolve(root, gsxt.session_file)
     gsxt_channel = scheduler._channels[ChannelKind.GSXT_OFFICIAL]
     corpus = config.integrations.corpus
@@ -183,18 +187,16 @@ def build_doctor_report(
             },
         },
         "warehouse": {
-            "dir": str(wh),
             "parquet_enabled": config.output.parquet_enabled,
-            "entities_part": str(entities),
-            "entities_exists": entities.is_file(),
-            "edges_equity_part": str(edges),
-            "edges_exists": edges.is_file(),
+            **warehouse_summary,
         },
         "neo4j": {
             "enabled": config.neo4j.enabled,
             "auto_import": config.neo4j.auto_import,
             "uri": config.neo4j.uri,
             "user": config.neo4j.user,
+            "driver_installed": graph_driver_installed(),
+            "model": ["Company", "HOLDS", "BRANCH", "Supplement", "Conflict"],
         },
         "retry_queue": {
             "dir": str(Path(config.output.raw_dir) / "retry_queue"),
@@ -203,6 +205,12 @@ def build_doctor_report(
         "personas": scheduler._persona.list_ids(),
         "sessions": list_sessions(config),
     }
+    if config.neo4j.enabled and graph_driver_installed():
+        report["neo4j"]["connectivity"] = probe_neo4j(
+            config.neo4j.uri,
+            config.neo4j.user,
+            config.neo4j.password,
+        )
     if probe_sidecars:
         report["sidecars"] = build_sidecar_report(config)
     return report
