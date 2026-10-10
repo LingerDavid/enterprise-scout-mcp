@@ -32,6 +32,7 @@ class ImportStats:
     holds_merged: int = 0
     branches_merged: int = 0
     skipped_edges: int = 0
+    supplements_merged: int = 0
 
     def to_dict(self) -> dict[str, int]:
         return {
@@ -39,7 +40,24 @@ class ImportStats:
             "holds_merged": self.holds_merged,
             "branches_merged": self.branches_merged,
             "skipped_edges": self.skipped_edges,
+            "supplements_merged": self.supplements_merged,
         }
+
+
+def supplement_id(row: dict[str, Any]) -> str:
+    keyword = str(row.get("query_keyword", "")).strip()
+    dimension = str(row.get("dimension", "")).strip()
+    corpus_file = str(row.get("corpus_file", "")).strip()
+    collected_at = str(row.get("collected_at", "")).strip()
+    return "|".join(p for p in (keyword, dimension, corpus_file, collected_at) if p) or keyword
+
+
+def _supplement_paths(warehouse_dir: Path) -> list[Path]:
+    base = warehouse_dir / "supplements"
+    return [
+        base / "l3" / "part.parquet",
+        base / "judicial" / "part.parquet",
+    ]
 
 
 def _read_parquet(path: Path) -> list[dict[str, Any]]:
@@ -61,11 +79,15 @@ def import_warehouse(
     stats = ImportStats()
     entities = _read_parquet(warehouse_dir / "entities" / "part.parquet")
     edges = _read_parquet(warehouse_dir / "edges" / "equity" / "part.parquet")
+    supplements: list[dict[str, Any]] = []
+    for path in _supplement_paths(warehouse_dir):
+        supplements.extend(_read_parquet(path))
 
     if dry_run:
         stats.entities_merged = len(entities)
         stats.holds_merged = sum(1 for e in edges if e.get("relation") in ("invest", "holder"))
         stats.branches_merged = sum(1 for e in edges if e.get("relation") == "branch")
+        stats.supplements_merged = len(supplements)
         return stats
 
     from neo4j import GraphDatabase
@@ -149,6 +171,51 @@ def import_warehouse(
                     stats.holds_merged += 1
                 else:
                     stats.skipped_edges += 1
+
+            for row in supplements:
+                keyword = str(row.get("query_keyword", "")).strip()
+                if not keyword:
+                    continue
+                cid = company_id("", keyword)
+                sid = supplement_id(row)
+                if not sid:
+                    continue
+                session.run(
+                    "MERGE (c:Company {id: $id}) SET c.name = coalesce(c.name, $name)",
+                    id=cid,
+                    name=keyword,
+                )
+                session.run(
+                    """
+                    MERGE (s:Supplement {id: $sid})
+                    SET s.query_keyword = $query_keyword,
+                        s.dimension = $dimension,
+                        s.source_tier = $source_tier,
+                        s.source_channel = $source_channel,
+                        s.corpus_file = $corpus_file,
+                        s.grade = $grade,
+                        s.collected_at = $collected_at,
+                        s.payload_json = $payload_json,
+                        s.message = $message
+                    WITH s
+                    MATCH (c:Company {id: $cid})
+                    MERGE (c)-[r:HAS_SUPPLEMENT]->(s)
+                    SET r.dimension = $dimension,
+                        r.source_tier = $source_tier
+                    """,
+                    sid=sid,
+                    cid=cid,
+                    query_keyword=keyword,
+                    dimension=str(row.get("dimension", "")),
+                    source_tier=str(row.get("source_tier", "")),
+                    source_channel=str(row.get("source_channel", "")),
+                    corpus_file=str(row.get("corpus_file", "")),
+                    grade=str(row.get("grade", "")),
+                    collected_at=str(row.get("collected_at", "")),
+                    payload_json=str(row.get("payload_json", "")),
+                    message=str(row.get("message", "")),
+                )
+                stats.supplements_merged += 1
     finally:
         driver.close()
     return stats

@@ -152,7 +152,20 @@ MCP (enterprise-scout-mcp)
 
 **维度路由**（`--dims` / MCP `dims`）：`registry`（L1 GSXT / L2 ENScan）、`equity`（股东/投资/分支 → ENScan）、`digital`/`ip`（备案/小程序等 → ENScan）、`credit`（Handaas 凭证可用时走付费 API）/`judicial`（本地 corpus 或 stub）/`prefer-tier l3`（`corpus/l3` JSON/JSONL）、`prefer-tier l3`（academic stub）。多维度一次采集会自动合并 payload。
 
-模块落地状态见 `escout doctor` → `architecture` / `tiers`。可选依赖：
+模块落地状态见 `escout doctor` → `architecture` / `tiers`。
+
+**后端验收（Fine UI 最后做）：**
+
+```powershell
+escout verify --summary   # 架构模块 checklist（fine_ui 预期 false）
+pytest -q                 # 125+ tests
+escout corpus init
+escout import-neo4j --dry-run
+```
+
+**Phase 3 — Fine UI（未开始）：** 参考 `E:/Project/fine-2.7.2/README_images`（设置页 + 爱企查查询 + 多 Tab 结果），独立前端，接现有 MCP/escout API。
+
+可选依赖：
 
 ```powershell
 pip install -e ".[transport]"   # curl_cffi TLS 伪装

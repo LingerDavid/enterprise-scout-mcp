@@ -7,7 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from enterprise_scout_mcp.warehouse.neo4j_loader import company_id, import_warehouse, parse_percent
+from enterprise_scout_mcp.warehouse.neo4j_loader import (
+    company_id,
+    import_warehouse,
+    parse_percent,
+    supplement_id,
+)
 
 
 def test_company_id_fallback_to_name() -> None:
@@ -47,3 +52,36 @@ def test_import_warehouse_dry_run(tmp_path: Path) -> None:
     stats = import_warehouse(tmp_path, uri="", user="", password="", dry_run=True)
     assert stats.entities_merged == 1
     assert stats.holds_merged == 1
+
+
+def test_supplement_id_stable() -> None:
+    sid = supplement_id(
+        {
+            "query_keyword": "Acme",
+            "dimension": "judicial",
+            "corpus_file": "c.jsonl",
+            "collected_at": "2026-01-01T00:00:00+00:00",
+        }
+    )
+    assert "Acme" in sid
+    assert "judicial" in sid
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("pyarrow") is None,
+    reason="pyarrow not installed",
+)
+def test_import_warehouse_dry_run_includes_supplements(tmp_path: Path) -> None:
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    l3 = tmp_path / "supplements" / "l3"
+    l3.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [{"query_keyword": "Acme", "dimension": "registry", "corpus_file": "p.jsonl"}]
+        ),
+        l3 / "part.parquet",
+    )
+    stats = import_warehouse(tmp_path, uri="", user="", password="", dry_run=True)
+    assert stats.supplements_merged == 1

@@ -117,5 +117,12 @@ escout import-neo4j --uri bolt://127.0.0.1:7687 --user neo4j --password enterpri
 Or set `neo4j.enabled: true` and `neo4j.auto_import: true` in `config.yaml` to merge
 after successful collect / batch / drain.
 
-Graph model: `(:Company {id})-[:HOLDS {percent}]->(:Company)` plus optional `[:BRANCH]`.
-Penetration queries: `EnterpriseLake/cypher/equity_penetration.cypher`.
+Graph model:
+
+- `(:Company {id})-[:HOLDS {percent}]->(:Company)` plus optional `[:BRANCH]`
+- `(:Company)-[:HAS_SUPPLEMENT]->(:Supplement)` for L3 / judicial corpus rows
+
+Penetration queries: `EnterpriseLake/cypher/equity_penetration.cypher`.  
+Supplement queries: `EnterpriseLake/cypher/supplements.cypher`.
+
+Backend verification (no UI): `escout verify --summary`.

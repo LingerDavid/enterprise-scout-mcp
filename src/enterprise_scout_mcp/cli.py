@@ -325,6 +325,28 @@ def cmd_smoke_registry_l1(args: argparse.Namespace) -> int:
         scheduler.close()
 
 
+def cmd_verify(args: argparse.Namespace) -> int:
+    from enterprise_scout_mcp.diagnostics.verify import build_verify_report
+
+    config = load_config(args.config)
+    scheduler = CollectorScheduler(config)
+    try:
+        report = build_verify_report(scheduler, config)
+        if args.summary:
+            summary = {
+                "ok": report["ok"],
+                "failed": report["failed"],
+                "checks": report["checks"],
+                "note": report["note"],
+            }
+            print(json.dumps(summary, ensure_ascii=False, indent=2))
+        else:
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0 if report["ok"] else 1
+    finally:
+        scheduler.close()
+
+
 def cmd_corpus_init(args: argparse.Namespace) -> int:
     from enterprise_scout_mcp.config import resolve_project_root
     from enterprise_scout_mcp.integrations.corpus_init import init_corpus_dirs
@@ -432,6 +454,10 @@ def build_parser() -> argparse.ArgumentParser:
     neo4j.add_argument("--password", default=None)
     neo4j.add_argument("--dry-run", action="store_true")
     neo4j.set_defaults(func=cmd_import_neo4j)
+
+    verify = sub.add_parser("verify", help="Architecture backend checklist (excludes Fine UI)")
+    verify.add_argument("--summary", action="store_true", help="Print checks only, omit full doctor")
+    verify.set_defaults(func=cmd_verify)
 
     doctor = sub.add_parser("doctor", help="Check integration availability")
     doctor.add_argument(
