@@ -166,12 +166,14 @@ escout import-neo4j        # Company / HOLDS / Supplement / Conflict
 
 ```powershell
 pip install -e ".[ui]"
-escout serve               # API :8790；build 后同端口托管 ui/dist
 
-cd ui
-npm install
-npm run dev                # :5179，/api 代理到 8790
-npm run build              # 产物 → ui/dist，escout serve 可直接打开
+# 推荐：不依赖 PATH 里的 escout
+.\serve-ui.ps1             # 自动 build ui/dist + API :8790
+.\serve-ui-dev.ps1         # API :8790 + Vite :5179 热更新
+
+# 或手动
+.\.venv\Scripts\escout serve
+cd ui && npm run dev       # :5179，/api 代理到 8790
 ```
 
 页面：**设置**（warehouse / Neo4j / 通道）、**爱企查**（查询 + 股东/投资/分支 Tab）、**状态**（verify checklist）。

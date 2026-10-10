@@ -22,4 +22,5 @@ MCP-first enterprise registry intelligence orchestrator.
 cd E:\Project\enterprise-scout-mcp
 .\.venv\Scripts\pytest -q
 .\.venv\Scripts\escout doctor
+.\serve-ui.ps1              # Fine UI (no PATH escout needed)
 ```
