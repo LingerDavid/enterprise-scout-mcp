@@ -45,6 +45,32 @@ Lookup scans all corpus files and returns the first row where any of these field
 
 Nested `payload` objects are searched recursively.
 
+## Listed filings (`corpus/listed`)
+
+Pre-extracted annual / interim report rows for the value dossier. One JSON object per issuer filing:
+
+```json
+{
+  "issuer_id": "91110000710928885H",
+  "issuer_name": "示例股份有限公司",
+  "security_id": "SSE:600000",
+  "exchange": "SSE",
+  "code": "600000",
+  "period": "2024",
+  "scope": "consolidated",
+  "document_id": "ann-2024",
+  "document_date": "2025-03-31",
+  "facts": [
+    {"statement": "income", "item_code": "revenue", "value": "1000000000", "label": "营业收入"}
+  ],
+  "segments": [
+    {"kind": "product", "name": "示例产品", "revenue": "700000000", "cost": "400000000"}
+  ]
+}
+```
+
+`escout corpus import-listed` writes `warehouse/listed/{identity,facts,segments}/part.parquet`. Files named `_example*` are skipped on import.
+
 ## CLI
 
 ```powershell
@@ -52,6 +78,8 @@ escout collect 苏州挚途 --prefer-tier l3 --dims registry
 escout collect 苏州挚途 --dims judicial
 escout corpus init
 escout corpus status
+escout corpus import-listed --dry-run
+escout corpus import-listed
 ```
 
 See `escout doctor` → `corpus` for directory file counts.
