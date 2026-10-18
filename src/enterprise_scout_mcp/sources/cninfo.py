@@ -15,6 +15,7 @@ from urllib.parse import urljoin
 import httpx
 
 _QUERY_URL = "https://www.cninfo.com.cn/new/hisAnnouncement/query"
+_ORG_CATALOG_URL = "https://www.cninfo.com.cn/new/data/szse_stock.json"
 _STATIC_BASE = "https://static.cninfo.com.cn/"
 _HEADERS = {
     "User-Agent": "Mozilla/5.0",
@@ -24,10 +25,10 @@ _HEADERS = {
 }
 
 # Category codes used by cninfo fulltext search.
-CATEGORY_ANNUAL = "category_ndbg_szsh"
-CATEGORY_INTERIM = "category_bndbg_szsh"
-CATEGORY_Q1 = "category_yjdbg_szsh"
-CATEGORY_Q3 = "category_sjdbg_szsh"
+CATEGORY_ANNUAL = "category_ndbg_szsh;"
+CATEGORY_INTERIM = "category_bndbg_szsh;"
+CATEGORY_Q1 = "category_yjdbg_szsh;"
+CATEGORY_Q3 = "category_sjdbg_szsh;"
 
 _SUFFIX_COLUMN = {"SH": "sse", "SZ": "szse", "BJ": "bj"}
 _SUFFIX_EXCHANGE = {"SH": "SSE", "SZ": "SZSE", "BJ": "BSE"}
@@ -50,10 +51,10 @@ class CninfoAnnouncement:
     def document_date(self) -> str:
         if self.announce_time_ms <= 0:
             return ""
-        # cninfo returns epoch ms in Asia/Shanghai wall clock for display dates.
-        from datetime import datetime, timezone
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
 
-        dt = datetime.fromtimestamp(self.announce_time_ms / 1000.0, tz=timezone.utc)
+        dt = datetime.fromtimestamp(self.announce_time_ms / 1000.0, tz=ZoneInfo("Asia/Shanghai"))
         return dt.date().isoformat()
 
     @property
@@ -134,6 +135,80 @@ def _normalize_announcements(
     return out
 
 
+def org_id_from_catalog(payload: dict[str, Any], code: str) -> str:
+    """Pick orgId for a 6-digit code from cninfo ``szse_stock.json`` (covers SSE too)."""
+    rows = payload.get("stockList") if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        return ""
+    wanted = str(code or "").strip()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("code") or "").strip() == wanted:
+            return str(row.get("orgId") or "").strip()
+    return ""
+
+
+_org_cache: dict[str, str] | None = None
+
+
+def lookup_org_id(code: str, *, client: httpx.Client) -> str:
+    """Resolve cninfo orgId. Cached for the process. Soft-fail → ''."""
+    global _org_cache
+    wanted = str(code or "").strip()
+    if _org_cache is not None and wanted in _org_cache:
+        return _org_cache[wanted]
+    try:
+        resp = client.get(_ORG_CATALOG_URL)
+        resp.raise_for_status()
+        payload = resp.json()
+    except Exception:
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    cache: dict[str, str] = {}
+    rows = payload.get("stockList")
+    if isinstance(rows, list):
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            c = str(row.get("code") or "").strip()
+            oid = str(row.get("orgId") or "").strip()
+            if c and oid:
+                cache[c] = oid
+    _org_cache = cache
+    return cache.get(wanted, "")
+
+
+def announcement_query_form(
+    *,
+    code: str,
+    org_id: str,
+    column: str,
+    category: str,
+    page_num: int,
+    page_size: int,
+    se_date: str,
+) -> dict[str, str]:
+    cat = category if str(category).endswith(";") else f"{category};"
+    return {
+        "stock": f"{code},{org_id}",
+        "searchkey": "",
+        "secid": "",
+        "plate": "",
+        "category": cat,
+        "trade": "",
+        "column": column,
+        "pageNum": str(page_num),
+        "pageSize": str(page_size),
+        "tabName": "fulltext",
+        "sortName": "",
+        "sortType": "",
+        "seDate": se_date,
+        "isHLtitle": "true",
+    }
+
+
 def query_announcements(
     symbol_or_security: str,
     *,
@@ -143,29 +218,30 @@ def query_announcements(
     se_date: str = "",
     client: httpx.Client | None = None,
 ) -> list[CninfoAnnouncement]:
-    """Query cninfo fulltext index. Soft-fail → []."""
+    """Query cninfo fulltext index. Soft-fail → [].
+
+    The index ignores a bare stock code; ``stock`` must be ``code,orgId``.
+    """
     listing = resolve_listing(symbol_or_security)
     if listing is None:
         return []
     security_id, code, column = listing
-    form = {
-        "stock": code,
-        "searchkey": "",
-        "sdate": "",
-        "edate": "",
-        "seDate": se_date,
-        "category": category,
-        "plate": "",
-        "column": column,
-        "pageNum": str(page_num),
-        "pageSize": str(page_size),
-        "tabName": "fulltext",
-        "sortName": "",
-        "sortType": "",
-        "isHLtitle": "true",
-    }
     own = client is None
-    http = client or httpx.Client(timeout=30.0, headers=_HEADERS)
+    http = client or httpx.Client(timeout=30.0, headers=_HEADERS, follow_redirects=True)
+    org_id = lookup_org_id(code, client=http)
+    if not org_id:
+        if own:
+            http.close()
+        return []
+    form = announcement_query_form(
+        code=code,
+        org_id=org_id,
+        column=column,
+        category=category,
+        page_num=page_num,
+        page_size=page_size,
+        se_date=se_date,
+    )
     try:
         resp = http.post(_QUERY_URL, data=form)
         resp.raise_for_status()
@@ -193,7 +269,11 @@ def pick_annual_report(
     candidates = [a for a in announcements if a.adjunct_url]
     if year_s:
         candidates = [a for a in candidates if year_s in a.title]
-    full = [a for a in candidates if _ANNUAL_TITLE.search(a.title) and "摘要" not in a.title]
+    full = [
+        a
+        for a in candidates
+        if _ANNUAL_TITLE.search(a.title) and "摘要" not in a.title and "英文" not in a.title
+    ]
     pool = full or candidates
     if not pool:
         return None

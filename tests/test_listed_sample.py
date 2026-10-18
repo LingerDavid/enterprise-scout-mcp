@@ -16,6 +16,8 @@ pq = pytest.importorskip("pyarrow.parquet")
 class _FakeTransport(httpx.BaseTransport):
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         url = str(request.url)
+        if "szse_stock.json" in url:
+            return httpx.Response(200, json={"stockList": [{"code": "600519", "orgId": "gssh0600519"}]})
         if "hisAnnouncement/query" in url:
             body = {
                 "announcements": [
