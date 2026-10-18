@@ -78,8 +78,9 @@ escout corpus sample-listed 600519.SH --year 2024
 ```
 
 - 巨潮：年报公告索引 + PDF 落到 `corpus/listed/pdf/`；`document_id` 形如 `cninfo:{announcementId}`。
+- 东财公司概况：统一社会信用代码 → `issuer_id`，写入 `warehouse/listed/identity`。
 - 东财 F10：十大股东写入 corpus JSONL 的 `holders`，并追加 `warehouse/listed/holders`。
-- 三大表数字不在这里拉；用 tradecraft `python -m scripts.sample_listed_qmt_ingest`（QMT）。
+- 三大表数字不在这里拉；用 tradecraft `python -m scripts.sample_listed_qmt_ingest`（QMT）；会读 identity 把 facts 挂到信用代码上。
 
 ## CLI
 
