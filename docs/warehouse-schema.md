@@ -134,3 +134,7 @@ Conflict queries: `EnterpriseLake/cypher/conflicts.cypher`.
 Warehouse inventory: `escout doctor` → `warehouse.counts` (dry-run import stats).
 
 Backend verification (no UI): `escout verify --summary`.
+
+## Listed company tables (design)
+
+Value-investing dossier tables under `warehouse/listed/` and `warehouse/edges/listed_control/` are specified in [listed-company-product-map.md](listed-company-product-map.md). Writers and collectors are not implemented yet; existing `entities` / `edges/equity` paths are unchanged.
