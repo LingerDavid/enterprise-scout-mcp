@@ -9,6 +9,7 @@ from typing import Any, Iterator
 
 from enterprise_scout_mcp.output.listed_schema import (
     facts_row,
+    holders_row,
     identity_row,
     segments_row,
 )
@@ -134,7 +135,33 @@ def record_to_rows(record: dict[str, Any], *, collected_at: str) -> dict[str, li
             )
         )
 
-    return {"identity": identity, "facts": facts, "segments": segments}
+    holders: list[dict[str, Any]] = []
+    for holder in record.get("holders") or []:
+        if not isinstance(holder, dict):
+            continue
+        holder_name = str(holder.get("holder_name") or holder.get("name") or "").strip()
+        as_of = str(holder.get("as_of") or "").strip()
+        if not holder_name or not security_id or not as_of:
+            continue
+        holders.append(
+            holders_row(
+                security_id=security_id,
+                as_of=as_of,
+                rank=str(holder.get("rank") or ""),
+                holder_name=holder_name,
+                holder_type=str(holder.get("holder_type") or ""),
+                shares=str(holder.get("shares") or ""),
+                pct_total=str(holder.get("pct_total") or ""),
+                share_class=str(holder.get("share_class") or ""),
+                pledge_pct_of_holding=str(holder.get("pledge_pct_of_holding") or ""),
+                pledge_as_of=str(holder.get("pledge_as_of") or ""),
+                freeze_flag=str(holder.get("freeze_flag") or ""),
+                document_id=str(holder.get("document_id") or document_id),
+                collected_at=collected_at,
+            )
+        )
+
+    return {"identity": identity, "facts": facts, "segments": segments, "holders": holders}
 
 
 def import_listed_corpus(
@@ -152,6 +179,7 @@ def import_listed_corpus(
         "identity": 0,
         "facts": 0,
         "segments": 0,
+        "holders": 0,
         "dry_run": dry_run,
         "skipped": [],
     }
@@ -163,6 +191,7 @@ def import_listed_corpus(
     identity_rows: list[dict[str, Any]] = []
     facts_rows: list[dict[str, Any]] = []
     segment_rows: list[dict[str, Any]] = []
+    holder_rows: list[dict[str, Any]] = []
 
     paths = sorted(corpus_dir.glob("*.json")) + sorted(corpus_dir.glob("*.jsonl"))
     report["files"] = len(paths)
@@ -172,16 +201,18 @@ def import_listed_corpus(
         for record in _iter_records(path):
             report["records"] += 1
             parts = record_to_rows(record, collected_at=collected_at)
-            if not parts["identity"] and not parts["facts"]:
+            if not parts["identity"] and not parts["facts"] and not parts["holders"]:
                 report["skipped"].append(f"{path.name}:no_identity_or_facts")
                 continue
             identity_rows.extend(parts["identity"])
             facts_rows.extend(parts["facts"])
             segment_rows.extend(parts["segments"])
+            holder_rows.extend(parts["holders"])
 
     report["identity"] = len(identity_rows)
     report["facts"] = len(facts_rows)
     report["segments"] = len(segment_rows)
+    report["holders"] = len(holder_rows)
     if dry_run:
         return report
 
@@ -191,4 +222,6 @@ def import_listed_corpus(
         append_listed_rows(warehouse_dir, "facts", facts_rows)
     if segment_rows:
         append_listed_rows(warehouse_dir, "segments", segment_rows)
+    if holder_rows:
+        append_listed_rows(warehouse_dir, "holders", holder_rows)
     return report

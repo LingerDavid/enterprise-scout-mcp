@@ -424,6 +424,38 @@ def cmd_corpus_import_listed(args: argparse.Namespace) -> int:
     return 0 if report.get("records", 0) or report.get("dry_run") else 1
 
 
+def cmd_corpus_sample_listed(args: argparse.Namespace) -> int:
+    """Index cninfo annual PDF + Eastmoney top-10 holders for one listing."""
+    from enterprise_scout_mcp.config import resolve_project_root
+    from enterprise_scout_mcp.integrations.listed_sample import sample_listed_disclosure
+
+    config = load_config(args.config)
+    root = resolve_project_root()
+
+    def _dir(rel: str) -> Path:
+        p = Path(rel)
+        return p if p.is_absolute() else root / p
+
+    corpus_dir = Path(args.corpus_dir) if args.corpus_dir else _dir(config.integrations.corpus.listed_dir)
+    if not corpus_dir.is_absolute():
+        corpus_dir = root / corpus_dir
+    warehouse_dir = None if args.no_warehouse else _dir(config.output.warehouse_dir)
+    pdf_dir = Path(args.pdf_dir) if args.pdf_dir else corpus_dir / "pdf"
+    report = sample_listed_disclosure(
+        args.symbol,
+        corpus_dir=corpus_dir,
+        warehouse_dir=warehouse_dir,
+        pdf_dir=pdf_dir,
+        year=args.year or None,
+        download=not args.no_download,
+        dry_run=bool(args.dry_run),
+    )
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    if report.get("skipped") and not report.get("picked") and not report.get("holders"):
+        return 1
+    return 0
+
+
 def cmd_drain_retry(args: argparse.Namespace) -> int:
     from enterprise_scout_mcp.retry import drain_retry_queue
 
@@ -583,6 +615,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     corpus_import.add_argument("--dry-run", action="store_true", help="Count rows without writing")
     corpus_import.set_defaults(func=cmd_corpus_import_listed, corpus_cmd="import-listed")
+    corpus_sample = corpus_sub.add_parser(
+        "sample-listed",
+        help="Sample one listing: cninfo annual PDF index + Eastmoney top-10 holders",
+    )
+    corpus_sample.add_argument("symbol", help="600519.SH or SSE:600519")
+    corpus_sample.add_argument("--year", default="", help="Prefer annual report title containing year")
+    corpus_sample.add_argument("--corpus-dir", default="", help="Override corpus.listed_dir")
+    corpus_sample.add_argument("--pdf-dir", default="", help="PDF download directory (default corpus/pdf)")
+    corpus_sample.add_argument("--no-download", action="store_true", help="Index only, skip PDF bytes")
+    corpus_sample.add_argument("--no-warehouse", action="store_true", help="Write corpus JSONL only")
+    corpus_sample.add_argument("--dry-run", action="store_true", help="Query without writing")
+    corpus_sample.set_defaults(func=cmd_corpus_sample_listed, corpus_cmd="sample-listed")
 
     drain = sub.add_parser("drain-retry", help="Re-run jobs from raw/retry_queue")
     drain.add_argument("--limit", type=int, default=0, help="Max jobs (0 = all)")
