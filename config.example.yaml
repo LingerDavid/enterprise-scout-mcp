@@ -106,11 +106,12 @@ integrations:
     solver_provider: ""          # capsolver
     solver_api_key: ""
 
-  # L3 academic + judicial local corpus (JSON / JSONL)
+  # L3 academic + judicial + listed filings corpus (JSON / JSONL)
   corpus:
     enabled: true
     l3_dir: "G:/enterprise_lake/corpus/l3"
     judicial_dir: "G:/enterprise_lake/corpus/judicial"
+    listed_dir: "G:/enterprise_lake/corpus/listed"
 
 output:
   warehouse_dir: "G:/enterprise_lake/warehouse"

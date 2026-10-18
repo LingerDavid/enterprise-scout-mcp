@@ -72,9 +72,13 @@ def test_entity_row_corpus_academic() -> None:
 def test_init_corpus_dirs(tmp_path) -> None:
     l3 = tmp_path / "l3"
     jud = tmp_path / "judicial"
-    report = init_corpus_dirs(l3, jud, write_samples=True)
+    listed = tmp_path / "listed"
+    report = init_corpus_dirs(l3, jud, listed, write_samples=True)
     assert l3.is_dir()
     assert jud.is_dir()
+    assert listed.is_dir()
     assert (l3 / "_example.jsonl").is_file()
     assert (jud / "_example.jsonl").is_file()
+    assert (listed / "_example.jsonl").is_file()
     assert "l3" in report["samples"]
+    assert "listed" in report["samples"]

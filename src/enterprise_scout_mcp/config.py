@@ -65,11 +65,12 @@ class CaptchaConfig(BaseModel):
 
 
 class CorpusConfig(BaseModel):
-    """Local JSON/JSONL corpus for L3 academic and judicial dimensions."""
+    """Local JSON/JSONL corpus for L3 academic, judicial, and listed filings."""
 
     enabled: bool = True
     l3_dir: str = "G:/enterprise_lake/corpus/l3"
     judicial_dir: str = "G:/enterprise_lake/corpus/judicial"
+    listed_dir: str = "G:/enterprise_lake/corpus/listed"
 
 
 class SessionsConfig(BaseModel):

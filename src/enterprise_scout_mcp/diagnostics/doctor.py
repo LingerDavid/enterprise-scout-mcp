@@ -47,8 +47,10 @@ def build_doctor_report(
     corpus = config.integrations.corpus
     l3_dir = _resolve(root, corpus.l3_dir)
     judicial_dir = _resolve(root, corpus.judicial_dir)
+    listed_dir = _resolve(root, corpus.listed_dir)
     l3_stats = corpus_dir_stats(l3_dir)
     judicial_stats = corpus_dir_stats(judicial_dir)
+    listed_stats = corpus_dir_stats(listed_dir)
     l3_channel = scheduler._channels[ChannelKind.ACADEMIC_L3]
 
     report: dict = {
@@ -106,6 +108,7 @@ def build_doctor_report(
             "enabled": corpus.enabled,
             "l3": l3_stats,
             "judicial": judicial_stats,
+            "listed": listed_stats,
         },
         "gsxt": {
             "enabled": gsxt.enabled,

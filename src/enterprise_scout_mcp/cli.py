@@ -371,6 +371,7 @@ def cmd_corpus_init(args: argparse.Namespace) -> int:
     report = init_corpus_dirs(
         _dir(corpus.l3_dir),
         _dir(corpus.judicial_dir),
+        _dir(corpus.listed_dir),
         write_samples=not args.no_samples,
     )
     print(json.dumps(report, ensure_ascii=False, indent=2))
@@ -393,9 +394,34 @@ def cmd_corpus_status(args: argparse.Namespace) -> int:
         "enabled": corpus.enabled,
         "l3": corpus_dir_stats(_dir(corpus.l3_dir)),
         "judicial": corpus_dir_stats(_dir(corpus.judicial_dir)),
+        "listed": corpus_dir_stats(_dir(corpus.listed_dir)),
     }
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0
+
+
+def cmd_corpus_import_listed(args: argparse.Namespace) -> int:
+    from enterprise_scout_mcp.config import resolve_project_root
+    from enterprise_scout_mcp.integrations.listed_corpus import import_listed_corpus
+
+    config = load_config(args.config)
+    root = resolve_project_root()
+
+    def _dir(rel: str) -> Path:
+        p = Path(rel)
+        return p if p.is_absolute() else root / p
+
+    corpus_dir = Path(args.corpus_dir) if args.corpus_dir else _dir(config.integrations.corpus.listed_dir)
+    if not corpus_dir.is_absolute():
+        corpus_dir = root / corpus_dir
+    warehouse_dir = _dir(config.output.warehouse_dir)
+    report = import_listed_corpus(
+        corpus_dir,
+        warehouse_dir,
+        dry_run=bool(args.dry_run),
+    )
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return 0 if report.get("records", 0) or report.get("dry_run") else 1
 
 
 def cmd_drain_retry(args: argparse.Namespace) -> int:
@@ -539,13 +565,24 @@ def build_parser() -> argparse.ArgumentParser:
     smoke_l1.add_argument("--persona", default=None)
     smoke_l1.set_defaults(func=cmd_smoke_registry_l1)
 
-    corpus = sub.add_parser("corpus", help="L3 / judicial local corpus status")
+    corpus = sub.add_parser("corpus", help="L3 / judicial / listed local corpus")
     corpus_sub = corpus.add_subparsers(dest="corpus_cmd", required=True)
     corpus_status = corpus_sub.add_parser("status", help="Show corpus dirs and file counts")
     corpus_status.set_defaults(func=cmd_corpus_status, corpus_cmd="status")
     corpus_init = corpus_sub.add_parser("init", help="Create corpus dirs and example JSONL")
     corpus_init.add_argument("--no-samples", action="store_true", help="Skip writing _example.jsonl")
     corpus_init.set_defaults(func=cmd_corpus_init, corpus_cmd="init")
+    corpus_import = corpus_sub.add_parser(
+        "import-listed",
+        help="Import listed JSON/JSONL into warehouse/listed parquet",
+    )
+    corpus_import.add_argument(
+        "--corpus-dir",
+        default="",
+        help="Override corpus.listed_dir",
+    )
+    corpus_import.add_argument("--dry-run", action="store_true", help="Count rows without writing")
+    corpus_import.set_defaults(func=cmd_corpus_import_listed, corpus_cmd="import-listed")
 
     drain = sub.add_parser("drain-retry", help="Re-run jobs from raw/retry_queue")
     drain.add_argument("--limit", type=int, default=0, help="Max jobs (0 = all)")
