@@ -175,10 +175,13 @@ ROE：`net_profit_parent / average(equity_parent 期初, 期末)`；缺期初不
 
 | 内容 | 来源 |
 |------|------|
-| 三大表、主营构成、前十大、实控人、子公司清单 | 定期报告 / 权益变动书 / 质押公告（披露原文） |
+| 三大表科目数字 | QMT / BigQMT `download_financial_data`（Income/Balance/CashFlow）；tradecraft `value_qmt` → `listed/facts` |
+| 年报 PDF、公告编号 | 巨潮 `cninfo`（`escout corpus sample-listed`） |
+| 前十大（采样过渡） | 东财 F10；正式口径仍以年报名册为准 |
+| 主营构成、实控人、子公司清单 | 定期报告 PDF / 权益变动书（抽取后入 corpus） |
 | 代码、交易所、最新报告期；可选申万 | 名册或分类镜像；与披露冲突时披露胜出 |
 | 未上市主体更深股权 | 现有 `Dimension.EQUITY` + ENScan，按需 |
-| 已抽取年报 | `corpus/listed` |
+| 已抽取/采样语料 | `corpus/listed` |
 
 建议维度（实现时再改 `models.Dimension`）：`listed_identity`、`listed_fundamental`、`listed_segment`、`listed_equity`。一次档案编排这些维度；失败保持 `partial`，不阻断已成功视图。
 

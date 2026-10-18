@@ -69,7 +69,17 @@ Pre-extracted annual / interim report rows for the value dossier. One JSON objec
 }
 ```
 
-`escout corpus import-listed` writes `warehouse/listed/{identity,facts,segments}/part.parquet`. Files named `_example*` are skipped on import.
+`escout corpus import-listed` writes `warehouse/listed/{identity,facts,segments,holders}/part.parquet`. Files named `_example*` are skipped on import.
+
+### Sampling live disclosure (cninfo + Eastmoney)
+
+```powershell
+escout corpus sample-listed 600519.SH --year 2024
+```
+
+- 巨潮：年报公告索引 + PDF 落到 `corpus/listed/pdf/`；`document_id` 形如 `cninfo:{announcementId}`。
+- 东财 F10：十大股东写入 corpus JSONL 的 `holders`，并追加 `warehouse/listed/holders`。
+- 三大表数字不在这里拉；用 tradecraft `python -m scripts.sample_listed_qmt_ingest`（QMT）。
 
 ## CLI
 
@@ -78,6 +88,7 @@ escout collect 苏州挚途 --prefer-tier l3 --dims registry
 escout collect 苏州挚途 --dims judicial
 escout corpus init
 escout corpus status
+escout corpus sample-listed 600519.SH --year 2024
 escout corpus import-listed --dry-run
 escout corpus import-listed
 ```
