@@ -35,6 +35,7 @@ FACTS_COLUMNS = (
     "scale_in_source",
     "derived",
     "document_id",
+    "document_date",
     "audit_opinion",
     "collected_at",
     "supersedes_ref",
