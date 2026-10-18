@@ -23,6 +23,7 @@ from enterprise_scout_mcp.sources.cninfo import (
     query_announcements,
     resolve_listing,
 )
+from enterprise_scout_mcp.sources.eastmoney_company import fetch_company_profile
 from enterprise_scout_mcp.sources.eastmoney_holders import fetch_top_holders
 
 
@@ -47,6 +48,8 @@ def sample_listed_disclosure(
         "picked": None,
         "pdf_path": None,
         "holders": 0,
+        "issuer_id": "",
+        "issuer_name": "",
         "corpus_path": None,
         "dry_run": dry_run,
         "skipped": [],
@@ -57,6 +60,15 @@ def sample_listed_disclosure(
     security_id, code, _column = listing
     exchange = security_id.split(":", 1)[0]
     report["security_id"] = security_id
+
+    profile = fetch_company_profile(security_id, client=client)
+    credit_code = str(profile.get("credit_code") or "").strip()
+    issuer_id = credit_code or security_id
+    issuer_name = str(profile.get("issuer_name") or "").strip()
+    report["issuer_id"] = issuer_id
+    report["issuer_name"] = issuer_name
+    if not credit_code:
+        report["skipped"].append("no_credit_code")
 
     anns = query_announcements(
         security_id,
@@ -95,11 +107,13 @@ def sample_listed_disclosure(
         report["skipped"].append("no_holders")
 
     record: dict[str, Any] = {
-        "issuer_id": security_id,
-        "issuer_name": "",
+        "issuer_id": issuer_id,
+        "issuer_name": issuer_name,
         "security_id": security_id,
         "exchange": exchange,
         "code": code,
+        "csrc_industry_l1": str(profile.get("csrc_industry_l1") or ""),
+        "csrc_industry_l2": str(profile.get("csrc_industry_l2") or ""),
         "period": str(year) if year is not None else "",
         "scope": "consolidated",
         "document_id": document_id,
@@ -107,6 +121,7 @@ def sample_listed_disclosure(
         "source": {
             "cninfo": report["picked"],
             "holders_feed": "eastmoney_f10",
+            "identity_feed": "eastmoney_company_survey",
         },
         "facts": [],
         "segments": [],
@@ -138,11 +153,13 @@ def sample_listed_disclosure(
     if warehouse_dir is not None:
         identity = [
             identity_row(
-                issuer_id=security_id,
-                issuer_name="",
+                issuer_id=issuer_id,
+                issuer_name=issuer_name,
                 security_id=security_id,
                 exchange=exchange,
                 code=code,
+                csrc_industry_l1=str(profile.get("csrc_industry_l1") or ""),
+                csrc_industry_l2=str(profile.get("csrc_industry_l2") or ""),
                 document_id=document_id,
                 collected_at=collected_at,
                 is_primary_listing="true",

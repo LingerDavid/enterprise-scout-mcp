@@ -43,6 +43,17 @@ class _FakeTransport(httpx.BaseTransport):
                 ]
             }
             return httpx.Response(200, json=body)
+        if "CompanySurvey" in url:
+            body = {
+                "jbzl": [
+                    {
+                        "REG_NUM": "9152000071430580XT",
+                        "ORG_NAME": "贵州茅台酒股份有限公司",
+                        "INDUSTRYCSRC1": "制造业-酒、饮料和精制茶制造业",
+                    }
+                ]
+            }
+            return httpx.Response(200, json=body)
         return httpx.Response(404)
 
 
@@ -65,13 +76,17 @@ def test_sample_listed_writes_corpus_and_holders(tmp_path: Path) -> None:
         client.close()
 
     assert report["security_id"] == "SSE:600519"
+    assert report["issuer_id"] == "9152000071430580XT"
     assert report["holders"] == 1
     assert report["picked"]["document_id"] == "cninfo:ann-99"
     assert Path(report["pdf_path"]).is_file()
     assert Path(report["corpus_path"]).is_file()
     line = Path(report["corpus_path"]).read_text(encoding="utf-8").strip()
     record = json.loads(line)
+    assert record["issuer_id"] == "9152000071430580XT"
     assert record["holders"][0]["holder_name"] == "A"
     holders_path = warehouse / "listed" / "holders" / "part.parquet"
     assert holders_path.is_file()
     assert pq.read_table(holders_path).num_rows == 1
+    identity_path = warehouse / "listed" / "identity" / "part.parquet"
+    assert pq.read_table(identity_path).to_pylist()[0]["issuer_id"] == "9152000071430580XT"
