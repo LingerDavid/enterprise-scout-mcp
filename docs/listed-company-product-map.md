@@ -205,7 +205,7 @@ ROE：`net_profit_parent / average(equity_parent 期初, 期末)`；缺期初不
 
 ### facts
 
-`issuer_id`, `period`, `scope`, `statement`（`income` / `balance` / `cashflow`）, `item_code`, `label`, `value`, `unit`, `currency`, `scale_in_source`, `derived`, `document_id`, `audit_opinion`, `collected_at`, `supersedes_ref`
+`issuer_id`, `period`, `scope`, `statement`（`income` / `balance` / `cashflow`）, `item_code`, `label`, `value`, `unit`, `currency`, `scale_in_source`, `derived`, `document_id`, `document_date`（公告日 `YYYY-MM-DD`，决策日过滤用）, `audit_opinion`, `collected_at`, `supersedes_ref`
 
 **利润 item_code（顺序即瀑布序）**  
 `revenue`, `operating_cost`, `gross_profit`, `tax_surcharge`, `selling_exp`, `admin_exp`, `rd_exp`, `finance_exp`, `other_income`, `invest_income`, `fv_change`, `credit_impairment`, `asset_impairment`, `asset_disposal`, `operating_profit`, `non_operating_income`, `non_operating_expense`, `profit_before_tax`, `income_tax`, `net_profit`, `net_profit_parent`, `net_profit_minority`；旁挂 `net_profit_parent_ex_nonrecurring`。
