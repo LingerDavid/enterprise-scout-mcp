@@ -17,8 +17,10 @@ from enterprise_scout_mcp.output.listed_schema import (
     subsidiaries_row,
 )
 
+# Prefer the main top-10 holdings table; avoid 转融通 / 无限售续页误命中.
 _HOLDER_TITLE = re.compile(
-    r"前\s*十\s*名\s*股\s*东|前\s*10\s*名\s*股\s*东|持股情况.*前十",
+    r"前\s*十\s*名\s*股\s*东\s*持\s*股\s*情\s*况|前\s*10\s*名\s*股\s*东\s*持\s*股|"
+    r"截至报告期末前十名股东",
     re.I,
 )
 _SUB_TITLE = re.compile(
@@ -34,11 +36,11 @@ _SHARES_CELL = re.compile(r"^\s*[\d,]+(?:\.\d+)?\s*$")
 
 _MAX_SUBSIDIARIES = 80
 
-_HOLDER_NAME_HINTS = ("股东名称", "股东姓名", "名称")
-_HOLDER_PCT_HINTS = ("持股比例", "占总股本", "比例")
-_HOLDER_SHARES_HINTS = ("持股数量", "持股数", "持股")
-_HOLDER_TYPE_HINTS = ("股份性质", "股东性质", "性质")
-_SUB_NAME_HINTS = ("公司名称", "子公司名称", "企业名称", "名称")
+_HOLDER_NAME_HINTS = ("股东名称", "股东姓名")
+_HOLDER_PCT_HINTS = ("持股比例", "占总股本比例", "比例(%)", "比例（%）", "比例")
+_HOLDER_SHARES_HINTS = ("期末持股数量", "持股数量", "持股数")
+_HOLDER_TYPE_HINTS = ("股东性质", "股份性质")
+_SUB_NAME_HINTS = ("子公司名称", "公司名称", "企业名称")
 _SUB_PCT_HINTS = ("持股比例", "直接持股", "权益比例", "比例")
 _SUB_BIZ_HINTS = ("主营业务", "主要业务", "经营范围")
 
@@ -106,15 +108,18 @@ def _find_col(headers: Sequence[str], hints: Sequence[str]) -> int | None:
     return None
 
 
-def _parse_pct_percent(raw: str) -> str:
-    """Return percentage string (F10-compatible), or empty."""
+def _parse_pct_percent(raw: str, *, assume_percent: bool = True) -> str:
+    """Return percentage string (F10-compatible), or empty.
+
+    Annual-report 「比例(%)」 cells are already percent (including 0.40).
+    Only promote fraction→percent when ``assume_percent`` is False.
+    """
     s = _cell(raw).replace(",", "").replace("％", "%")
     m = _PCT_CELL.match(s)
     if not m:
         return ""
     val = float(m.group(1))
-    # Fraction form (0.54) → percent; already-percent (54) left as-is.
-    if 0 < abs(val) <= 1.0 and "%" not in s:
+    if not assume_percent and 0 < abs(val) <= 1.0 and "%" not in s:
         val *= 100.0
     return f"{val:.4f}".rstrip("0").rstrip(".")
 
@@ -133,21 +138,37 @@ def _table_has_title_nearby(page_text: str, title_re: re.Pattern[str]) -> bool:
     return bool(title_re.search(page_text or ""))
 
 
+def _is_holder_seed_page(text: str) -> bool:
+    if not _table_has_title_nearby(text, _HOLDER_TITLE):
+        return False
+    # 转融通专表也会写「前十名股东」；主表标题常含「不含通过转融通」，需放行。
+    t = text or ""
+    if "参与转融通业务出借" in t or "转融通出借/归还原因" in t:
+        return False
+    return True
+
 def _pick_holder_tables(
     pages: Sequence[PageContent],
 ) -> tuple[list[list[list[str]]], list[int]]:
-    hits: list[int] = []
+    """Collect holder tables; include the immediate next page for continuations."""
+    by_index = {p.index: p for p in pages}
+    ordered = sorted(by_index)
+    seed_idxs = [idx for idx in ordered if _is_holder_seed_page(by_index[idx].text)]
+    if not seed_idxs:
+        return [], []
+    # First real top-10 section only (avoid later repeats).
+    seed = seed_idxs[0]
+    want = {seed}
+    pos = ordered.index(seed)
+    if pos + 1 < len(ordered):
+        want.add(ordered[pos + 1])
+    hits = sorted(want)
     tables: list[list[list[str]]] = []
-    for page in pages:
-        if not _table_has_title_nearby(page.text, _HOLDER_TITLE):
-            continue
-        hits.append(page.index)
-        for tbl in page.tables:
+    for idx in hits:
+        for tbl in by_index[idx].tables:
             if len(tbl) >= 2:
                 tables.append(tbl)
     return tables, hits
-
-
 def _pick_first_sub_table(
     pages: Sequence[PageContent],
 ) -> tuple[list[list[str]] | None, list[int]]:
@@ -160,6 +181,60 @@ def _pick_first_sub_table(
     return None, []
 
 
+def _is_holder_noise_name(name: str) -> bool:
+    n = _cell(name)
+    if not n or n in {"合计", "小计"}:
+        return True
+    if n.startswith("前十") or "转融通" in n or "无限售条件股东" in n:
+        return True
+    if "股东名称" in n:
+        return True
+    return False
+
+
+def _heuristic_holder_fields(cells: list[str]) -> tuple[str, str, str, str] | None:
+    """Infer name / shares / pct / share_class from a continuation row (no header)."""
+    if not cells:
+        return None
+    name = cells[0]
+    if _is_holder_noise_name(name) or len(name) < 2:
+        return None
+    pct = ""
+    pct_i: int | None = None
+    for i, c in enumerate(cells[1:], start=1):
+        if not c:
+            continue
+        p = _parse_pct_percent(c, assume_percent=True)
+        if not p:
+            continue
+        try:
+            v = float(p)
+        except ValueError:
+            continue
+        if 0 < v <= 100:
+            pct = p
+            pct_i = i
+            break
+    if pct_i is None:
+        return None
+    # End-of-period shares sit before 比例; pick the largest to skip 报告期内增减.
+    shares = ""
+    best_n = -1
+    for c in cells[1:pct_i]:
+        s = _parse_shares(c)
+        if not s:
+            continue
+        n = int(s)
+        if n > best_n:
+            best_n = n
+            shares = s
+    share_class = ""
+    for c in cells[pct_i + 1 :]:
+        if c and re.search(r"法人|其他|国家|未知|境内|境外|自然人", c):
+            share_class = c
+            break
+    return name, shares, pct, share_class
+
 def _rows_from_holder_table(
     table: list[list[str]],
     *,
@@ -167,6 +242,7 @@ def _rows_from_holder_table(
     as_of: str,
     document_id: str,
     collected_at: str,
+    start_rank: int = 0,
 ) -> list[dict[str, Any]]:
     if not table:
         return []
@@ -175,29 +251,38 @@ def _rows_from_holder_table(
     pct_i = _find_col(headers, _HOLDER_PCT_HINTS)
     shares_i = _find_col(headers, _HOLDER_SHARES_HINTS)
     type_i = _find_col(headers, _HOLDER_TYPE_HINTS)
-    if name_i is None or pct_i is None:
-        return []
+    use_header = name_i is not None and pct_i is not None
+    data_rows = table[1:] if use_header else table
     out: list[dict[str, Any]] = []
-    rank = 0
-    for raw in table[1:]:
-        cells = [_cell(c) for c in raw]
-        if name_i >= len(cells):
-            continue
-        name = cells[name_i]
-        if not name or name in {"合计", "小计"} or name.startswith("前十"):
-            continue
-        pct = _parse_pct_percent(cells[pct_i] if pct_i < len(cells) else "")
-        if not pct:
-            continue
-        rank += 1
-        if rank > 10:
+    rank = start_rank
+    for raw in data_rows:
+        if rank >= 10:
             break
-        shares = ""
-        if shares_i is not None and shares_i < len(cells):
-            shares = _parse_shares(cells[shares_i])
-        share_class = ""
-        if type_i is not None and type_i < len(cells):
-            share_class = cells[type_i]
+        cells = [_cell(c) for c in raw]
+        if use_header:
+            if name_i >= len(cells):
+                continue
+            name = cells[name_i]
+            if _is_holder_noise_name(name):
+                continue
+            pct = _parse_pct_percent(
+                cells[pct_i] if pct_i < len(cells) else "",
+                assume_percent=True,
+            )
+            if not pct:
+                continue
+            shares = ""
+            if shares_i is not None and shares_i < len(cells):
+                shares = _parse_shares(cells[shares_i])
+            share_class = ""
+            if type_i is not None and type_i < len(cells):
+                share_class = cells[type_i]
+        else:
+            guessed = _heuristic_holder_fields(cells)
+            if guessed is None:
+                continue
+            name, shares, pct, share_class = guessed
+        rank += 1
         out.append(
             holders_row(
                 security_id=security_id,
@@ -213,7 +298,6 @@ def _rows_from_holder_table(
             )
         )
     return out
-
 
 def _validate_holders(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not rows:
@@ -399,23 +483,39 @@ def extract_equity_from_pages(
 
     holder_tables, holder_pages = _pick_holder_tables(pages)
     result.page_hits["holders"] = holder_pages
-    holders: list[dict[str, Any]] = []
+    best: list[dict[str, Any]] = []
+    stitched: list[dict[str, Any]] = []
     for tbl in holder_tables:
-        holders = _rows_from_holder_table(
+        chunk = _rows_from_holder_table(
             tbl,
             security_id=security_id,
             as_of=as_of,
             document_id=document_id,
             collected_at=collected_at,
+            start_rank=0,
         )
-        holders = _validate_holders(holders)
-        if holders:
-            break
+        alone = _validate_holders(chunk[:10])
+        if len(alone) > len(best):
+            best = alone
+        # Cross-page: header page often has 0 data rows; stitch onto continuation.
+        if len(stitched) < 10:
+            more = _rows_from_holder_table(
+                tbl,
+                security_id=security_id,
+                as_of=as_of,
+                document_id=document_id,
+                collected_at=collected_at,
+                start_rank=len(stitched),
+            )
+            stitched.extend(more)
+    stitched_ok = _validate_holders(stitched[:10])
+    holders = stitched_ok if len(stitched_ok) >= len(best) else best
     if holders:
+        for i, row in enumerate(holders, start=1):
+            row["rank"] = str(i)
         result.holders = holders
     else:
         result.skipped.append("no_holders_table")
-
     if not period:
         result.skipped.append("no_period_for_subsidiaries")
     else:

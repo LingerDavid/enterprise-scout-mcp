@@ -72,6 +72,44 @@ def test_extract_holders_and_subsidiaries_from_pages() -> None:
     assert result.listed_control[0]["endpoint_type"] == "state"
 
 
+def test_extract_holders_cross_page_continuation() -> None:
+    """Header on page N, data rows on page N+1 (cninfo layout)."""
+    header_page = PageContent(
+        index=68,
+        text="前十名股东持股情况（不含通过转融通出借股份）",
+        tables=[
+            [
+                ["股东名称（全称）", "报告期内增减", "期末持股数量", "比例(%)", "股东性质"],
+            ]
+        ],
+    )
+    # Header-only table has len 1 — picker requires len>=2; use a stub second row.
+    header_page.tables[0].append(["", "", "", "", ""])
+    data_page = PageContent(
+        index=69,
+        text="有限售条件股份数量",
+        tables=[
+            [
+                ["中国北京同仁堂(集团)有限责任公司", "0", "719308540", "52.45", "国有法人"],
+                ["中国证券金融股份有限公司", "0", "41033808", "2.99", "未知"],
+                ["香港中央结算有限公司", "4521522", "28484677", "2.08", "境外法人"],
+            ]
+        ],
+    )
+    result = extract_equity_from_pages(
+        [header_page, data_page],
+        security_id="SSE:600085",
+        issuer_id="91110000DEMO",
+        document_id="cninfo:demo",
+        period="2024",
+        as_of="2025-04-04",
+    )
+    assert len(result.holders) == 3
+    assert result.holders[0]["holder_name"].startswith("中国北京同仁堂")
+    assert float(result.holders[0]["pct_total"]) == pytest.approx(52.45)
+    assert float(result.holders[2]["pct_total"]) == pytest.approx(2.08)
+
+
 def test_replace_holders_is_idempotent(tmp_path: Path) -> None:
     warehouse = tmp_path / "warehouse"
     rows = [
