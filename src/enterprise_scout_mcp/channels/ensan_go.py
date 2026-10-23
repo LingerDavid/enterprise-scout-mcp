@@ -64,6 +64,8 @@ class EnsanGoChannel(CollectionChannel):
         }
         if task.fields:
             params["filed"] = ",".join(task.fields)
+        if task.invest_min is not None:
+            params["invest"] = float(task.invest_min)
 
         try:
             r = self._client.get("/api/info", params=params)

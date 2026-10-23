@@ -14,6 +14,7 @@ EDGE_COLUMNS = (
     "source_channel",
     "query_keyword",
     "collected_at",
+    "credit_code",
     "payload_json",
 )
 
@@ -30,6 +31,7 @@ def edge_row(
     query_keyword: str,
     collected_at: str,
     payload_json: str,
+    credit_code: str = "",
 ) -> dict[str, Any]:
     return {
         "src_name": src_name,
@@ -41,5 +43,6 @@ def edge_row(
         "source_channel": source_channel,
         "query_keyword": query_keyword,
         "collected_at": collected_at,
+        "credit_code": credit_code or "",
         "payload_json": payload_json,
     }

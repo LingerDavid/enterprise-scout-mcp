@@ -18,8 +18,18 @@ NAME_KEYS = (
     "投资人",
     "投资机构",
     "子公司",
+    "供应商名称",
+    "供应商",
 )
 RATIO_KEYS = ("持股比例", "投资比例", "ratio", "比例", "占股比例", "scale")
+CREDIT_KEYS = (
+    "信用代码",
+    "统一社会信用代码",
+    "creditCode",
+    "credit_code",
+    "orgNumber",
+    "纳税人识别号",
+)
 
 SECTION_RELATION = {
     "invest": "invest",
@@ -29,6 +39,7 @@ SECTION_RELATION = {
     "holder": "holder",
     "股东": "holder",
     "branch": "branch",
+    "supplier": "supply",
 }
 
 
@@ -62,11 +73,13 @@ def extract_edges(result: CollectResult) -> list[dict[str, Any]]:
             if not name:
                 continue
             ratio = _pick(row, RATIO_KEYS)
+            credit = _pick(row, CREDIT_KEYS)
             if relation == "invest":
                 src, dst = root, name
             elif relation == "holder":
                 src, dst = name, root
             else:
+                # branch / supply: center → other
                 src, dst = root, name
             edges.append(
                 edge_row(
@@ -79,6 +92,7 @@ def extract_edges(result: CollectResult) -> list[dict[str, Any]]:
                     source_channel=result.channel.value,
                     query_keyword=root,
                     collected_at=ts,
+                    credit_code=credit,
                     payload_json=json.dumps(row, ensure_ascii=False),
                 )
             )

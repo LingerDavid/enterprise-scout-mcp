@@ -59,6 +59,7 @@ def cmd_collect(args: argparse.Namespace) -> int:
         if prefer_tier == SourceTier.L1 and platform_name == "aiqicha":
             platform_name = "gsxt"
         dims = _parse_dimensions(getattr(args, "dims", "") or "")
+        invest_min = getattr(args, "invest_min", None)
         task = CollectTask(
             keyword=args.keyword,
             platform=_platform(platform_name),
@@ -66,6 +67,7 @@ def cmd_collect(args: argparse.Namespace) -> int:
             dimensions=dims,
             prefer_tier=prefer_tier,
             depth=args.depth,
+            invest_min=float(invest_min) if invest_min is not None else None,
         )
         result = scheduler.run(task, persona_id=args.persona)
         print(
@@ -169,6 +171,47 @@ def cmd_collect_batch(args: argparse.Namespace) -> int:
         return 0 if failed == 0 else 1
     finally:
         scheduler.close()
+
+
+def cmd_equity_tree(args: argparse.Namespace) -> int:
+    from enterprise_scout_mcp.warehouse.equity_tree import build_equity_tree
+
+    config = load_config(args.config)
+    tree = build_equity_tree(
+        Path(config.output.warehouse_dir),
+        args.center,
+        max_depth=args.depth,
+        min_ratio=args.min_ratio,
+        max_nodes=args.max_nodes,
+        include_supply=bool(args.include_supply),
+    )
+    print(json.dumps(tree, ensure_ascii=False, indent=2))
+    return 0 if tree.get("resolved_name") else 1
+
+
+def cmd_equity_expand(args: argparse.Namespace) -> int:
+    from enterprise_scout_mcp.warehouse.equity_expand import expand_equity_tree
+
+    config = load_config(args.config)
+    scheduler = CollectorScheduler(config)
+    try:
+
+        def _collect(task: CollectTask):
+            return scheduler.run(task, persona_id=args.persona)
+
+        out = expand_equity_tree(
+            Path(config.output.warehouse_dir),
+            args.center,
+            collect_fn=_collect,
+            max_depth=args.depth,
+            min_ratio=args.min_ratio,
+            max_nodes=args.max_nodes,
+            max_collects=args.max_collects,
+        )
+    finally:
+        scheduler.close()
+    print(json.dumps(out, ensure_ascii=False, indent=2))
+    return 0 if out.get("ok") else 1
 
 
 def cmd_import_neo4j(args: argparse.Namespace) -> int:
@@ -456,6 +499,57 @@ def cmd_corpus_sample_listed(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_corpus_sample_listed_batch(args: argparse.Namespace) -> int:
+    """Batch-download missing annual PDFs + top-10 holders (resumable)."""
+    from enterprise_scout_mcp.config import resolve_project_root
+    from enterprise_scout_mcp.integrations.listed_sample import (
+        batch_sample_listed_disclosure,
+        symbols_from_instruments_parquet,
+        symbols_from_text_file,
+    )
+
+    config = load_config(args.config)
+    root = resolve_project_root()
+
+    def _dir(rel: str) -> Path:
+        p = Path(rel)
+        return p if p.is_absolute() else root / p
+
+    corpus_dir = Path(args.corpus_dir) if args.corpus_dir else _dir(config.integrations.corpus.listed_dir)
+    if not corpus_dir.is_absolute():
+        corpus_dir = root / corpus_dir
+    warehouse_dir = None if args.no_warehouse else _dir(config.output.warehouse_dir)
+    pdf_dir = Path(args.pdf_dir) if args.pdf_dir else corpus_dir / "pdf"
+    progress = (
+        Path(args.progress)
+        if args.progress
+        else corpus_dir / "_sample_listed_batch.jsonl"
+    )
+
+    if args.instruments:
+        symbols = symbols_from_instruments_parquet(Path(args.instruments))
+    elif args.symbols_file:
+        symbols = symbols_from_text_file(Path(args.symbols_file))
+    else:
+        print("error: pass --instruments or --symbols-file", file=sys.stderr)
+        return 2
+
+    summary = batch_sample_listed_disclosure(
+        symbols,
+        corpus_dir=corpus_dir,
+        warehouse_dir=warehouse_dir,
+        pdf_dir=pdf_dir,
+        progress_path=progress,
+        year=args.year or None,
+        download=not args.no_download,
+        delay_seconds=float(args.delay),
+        limit=int(args.limit),
+        skip_existing_corpus=not args.no_skip_existing,
+    )
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0 if summary.get("failed", 0) == 0 else 1
+
+
 def cmd_drain_retry(args: argparse.Namespace) -> int:
     from enterprise_scout_mcp.retry import drain_retry_queue
 
@@ -496,6 +590,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Source tier: l1=GSXT official, l2=ENScan",
     )
     collect.add_argument("--depth", type=int, default=1)
+    collect.add_argument(
+        "--invest-min",
+        type=float,
+        default=None,
+        help="ENScan invest= ratio filter (percent); omit to leave unset",
+    )
     collect.add_argument("--persona", default=None)
     collect.set_defaults(func=cmd_collect)
 
@@ -513,6 +613,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON checkpoint path for resume (skip already-done keywords)",
     )
     batch.set_defaults(func=cmd_collect_batch)
+
+    etree = sub.add_parser(
+        "equity-tree",
+        help="BFS equity tree from warehouse edges (local; no live pull)",
+    )
+    etree.add_argument("center", help="Company name (must appear in edges)")
+    etree.add_argument("--depth", type=int, default=2)
+    etree.add_argument("--min-ratio", type=float, default=0.0, help="Filter invest edges below %%")
+    etree.add_argument("--max-nodes", type=int, default=200)
+    etree.add_argument("--include-supply", action="store_true")
+    etree.set_defaults(func=cmd_equity_tree)
+
+    eexp = sub.add_parser(
+        "equity-expand",
+        help="Iteratively collect missing equity neighbors via aiqicha (refuses tyc)",
+    )
+    eexp.add_argument("center", help="Company name")
+    eexp.add_argument("--depth", type=int, default=2)
+    eexp.add_argument("--min-ratio", type=float, default=20.0)
+    eexp.add_argument("--max-nodes", type=int, default=200)
+    eexp.add_argument("--max-collects", type=int, default=30)
+    eexp.add_argument("--persona", default=None)
+    eexp.set_defaults(func=cmd_equity_expand)
 
     neo4j = sub.add_parser("import-neo4j", help="Import warehouse parquet into Neo4j")
     neo4j.add_argument("--warehouse-dir", default=None)
@@ -627,6 +750,38 @@ def build_parser() -> argparse.ArgumentParser:
     corpus_sample.add_argument("--no-warehouse", action="store_true", help="Write corpus JSONL only")
     corpus_sample.add_argument("--dry-run", action="store_true", help="Query without writing")
     corpus_sample.set_defaults(func=cmd_corpus_sample_listed, corpus_cmd="sample-listed")
+    corpus_batch = corpus_sub.add_parser(
+        "sample-listed-batch",
+        help="Batch sample: cninfo annual PDF + Eastmoney top-10 (resumable)",
+    )
+    corpus_batch.add_argument(
+        "--instruments",
+        default="",
+        help="tradecraft instruments.parquet (symbol column)",
+    )
+    corpus_batch.add_argument(
+        "--symbols-file",
+        default="",
+        help="Text file: one 600519.SH or SSE:600519 per line",
+    )
+    corpus_batch.add_argument("--year", default="", help="Prefer annual report title containing year")
+    corpus_batch.add_argument("--corpus-dir", default="", help="Override corpus.listed_dir")
+    corpus_batch.add_argument("--pdf-dir", default="", help="PDF download directory")
+    corpus_batch.add_argument(
+        "--progress",
+        default="",
+        help="JSONL progress path (default corpus/_sample_listed_batch.jsonl)",
+    )
+    corpus_batch.add_argument("--delay", type=float, default=1.5, help="Seconds between symbols")
+    corpus_batch.add_argument("--limit", type=int, default=0, help="Max symbols this run (0=all)")
+    corpus_batch.add_argument("--no-download", action="store_true", help="Index only, skip PDF bytes")
+    corpus_batch.add_argument("--no-warehouse", action="store_true", help="Write corpus JSONL only")
+    corpus_batch.add_argument(
+        "--no-skip-existing",
+        action="store_true",
+        help="Do not skip symbols that already have corpus+PDF",
+    )
+    corpus_batch.set_defaults(func=cmd_corpus_sample_listed_batch, corpus_cmd="sample-listed-batch")
 
     drain = sub.add_parser("drain-retry", help="Re-run jobs from raw/retry_queue")
     drain.add_argument("--limit", type=int, default=0, help="Max jobs (0 = all)")

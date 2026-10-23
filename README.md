@@ -10,9 +10,11 @@
 
 | 工具 | 说明 |
 |------|------|
-| `enterprise_collect` | 按关键词采集（平台 / 深度 / fields / persona） |
+| `enterprise_collect` | 按关键词采集（平台 / 深度 / fields / persona）；股权请用 `aiqicha`，勿默认天眼查 |
 | `enterprise_search` | 轻量搜索（depth=0） |
 | `enterprise_collect_batch` | 批量采集（支持 checkpoint） |
+| `enterprise_equity_tree` | 从湖边表本地 BFS 组穿透树（只读） |
+| `enterprise_equity_expand` | 按需用 **aiqicha** 迭代补采缺失法人邻居（拒绝 tyc） |
 | `scout_sessions` | 查看统一 cookie 注册表（GSXT / 爱企查 / ENScan） |
 | `sync_enscan_cookies` | 把本地 cookie 写入 ENScan config |
 | `scout_drain_retry` | 重跑 `raw/retry_queue`（成功则归档） |
@@ -115,7 +117,17 @@ escout smoke-registry-l1 苏州挚途
 
 VPN/Clash：`proxy_url: http://127.0.0.1:7897` 或 `$env:HTTPS_PROXY=...`（改善连通性，**不能**单独绕过瑞数环境检测）。`routing.l1_fallback_to_l2: true` 时 L1 仍失败则降级 ENScan（`degraded=true`）。
 
-默认 `fields`：`enterprise_info,partner,holds,invest,branch`（写入实体 + 股权边）。可用 `-f` / MCP `fields` 覆盖。
+默认 `fields`：`enterprise_info,partner,holds,invest,branch`（写入实体 + 股权边）。可用 `-f` / MCP `fields` 覆盖。可选加 `supplier`（供给边 `relation=supply`）。
+
+**股权穿透（本地树，非天眼查计费）：**
+
+```powershell
+escout collect 示例公司 -p aiqicha
+escout equity-tree 示例公司 --depth 2
+escout equity-expand 示例公司 --depth 2 --min-ratio 20   # 强制 aqc；勿并行
+```
+
+树读 `warehouse/edges/equity/part.parquet` 做 BFS；expand 只补从未作为 `query_keyword` 采集过的**法人**邻居（跳过自然人与分支）。边写入按 `(src,dst,relation)` 去重。
 
 `state_persist: true` 时，日配额与路由成功率写入 `state_dir`（默认 `./.state/`）。`collect-batch --checkpoint` 断点续跑：仅 `ok`/`partial` 记为 done，`error`/`captcha`/`blocked` 下次会重试。
 

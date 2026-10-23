@@ -60,6 +60,8 @@ class CollectTask:
     prefer_tier: SourceTier | None = None
     depth: int = 1
     force_channel: ChannelKind | None = None
+    # ENScan invest= filter (percent); None = omit query param.
+    invest_min: float | None = None
 
     @property
     def primary_dimension(self) -> Dimension:

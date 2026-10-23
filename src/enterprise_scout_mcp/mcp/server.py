@@ -51,8 +51,13 @@ def create_mcp_server():
         dims: str = "registry",
         prefer_tier: str = "",
         persona_id: str = "",
+        invest_min: float = -1.0,
     ) -> str:
-        """Collect enterprise info. L1: prefer_tier=l1 + platform gsxt (needs GSXT session)."""
+        """Collect enterprise info. L1: prefer_tier=l1 + platform gsxt (needs GSXT session).
+
+        Prefer aiqicha (aqc) for equity work; avoid tianyancha for cost.
+        invest_min < 0 means omit ENScan invest= filter.
+        """
         config = load_config()
         scheduler = CollectorScheduler(config)
         try:
@@ -67,6 +72,7 @@ def create_mcp_server():
                 fields=_parse_fields(fields),
                 dimensions=_parse_dims(dims),
                 prefer_tier=tier,
+                invest_min=None if invest_min < 0 else float(invest_min),
             )
             result = scheduler.run(task, persona_id=persona_id or None)
             return json.dumps(
@@ -163,6 +169,62 @@ def create_mcp_server():
         """Live-probe ENScan_GO and proxy_pool sidecars."""
         config = load_config()
         return json.dumps(build_sidecar_report(config), ensure_ascii=False, indent=2)
+
+    @mcp.tool()
+    def enterprise_equity_tree(
+        center: str,
+        max_depth: int = 2,
+        min_ratio: float = 0.0,
+        max_nodes: int = 200,
+        include_supply: bool = False,
+    ) -> str:
+        """BFS equity tree from warehouse edges (local read; no live pull)."""
+        from enterprise_scout_mcp.warehouse.equity_tree import build_equity_tree
+
+        config = load_config()
+        tree = build_equity_tree(
+            Path(config.output.warehouse_dir),
+            center,
+            max_depth=max_depth,
+            min_ratio=min_ratio,
+            max_nodes=max_nodes,
+            include_supply=include_supply,
+        )
+        return json.dumps(tree, ensure_ascii=False)
+
+    @mcp.tool()
+    def enterprise_equity_expand(
+        center: str,
+        max_depth: int = 2,
+        min_ratio: float = 20.0,
+        max_nodes: int = 200,
+        max_collects: int = 30,
+        persona_id: str = "",
+    ) -> str:
+        """Iteratively collect missing equity neighbors via aiqicha (refuses tianyancha)."""
+        from enterprise_scout_mcp.warehouse.equity_expand import expand_equity_tree
+
+        config = load_config()
+        scheduler = CollectorScheduler(config)
+        try:
+
+            def _collect(task: CollectTask):
+                return scheduler.run(task, persona_id=persona_id or None)
+
+            out = expand_equity_tree(
+                Path(config.output.warehouse_dir),
+                center,
+                collect_fn=_collect,
+                max_depth=max_depth,
+                min_ratio=min_ratio,
+                max_nodes=max_nodes,
+                max_collects=max_collects,
+            )
+        except ValueError as exc:
+            return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+        finally:
+            scheduler.close()
+        return json.dumps(out, ensure_ascii=False)
 
     @mcp.tool()
     def scout_import_neo4j(dry_run: bool = True) -> str:
