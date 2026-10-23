@@ -8,7 +8,12 @@ from pathlib import Path
 import httpx
 import pytest
 
-from enterprise_scout_mcp.integrations.listed_sample import sample_listed_disclosure
+from enterprise_scout_mcp.integrations.listed_sample import (
+    corpus_has_annual_pdf,
+    load_progress_ok_symbols,
+    sample_listed_disclosure,
+    symbols_from_text_file,
+)
 
 pq = pytest.importorskip("pyarrow.parquet")
 
@@ -92,3 +97,29 @@ def test_sample_listed_writes_corpus_and_holders(tmp_path: Path) -> None:
     assert pq.read_table(holders_path).num_rows == 1
     identity_path = warehouse / "listed" / "identity" / "part.parquet"
     assert pq.read_table(identity_path).to_pylist()[0]["issuer_id"] == "9152000071430580XT"
+
+
+def test_progress_and_corpus_skip_helpers(tmp_path: Path) -> None:
+    progress = tmp_path / "p.jsonl"
+    progress.write_text(
+        '{"symbol":"600519.SH","ok":true}\n'
+        '{"symbol":"000001.SZ","ok":false}\n'
+        '{"symbol":"000001.SZ","ok":true}\n',
+        encoding="utf-8",
+    )
+    assert load_progress_ok_symbols(progress) == {"600519.SH", "000001.SZ"}
+
+    corpus = tmp_path / "listed"
+    pdf = corpus / "pdf"
+    pdf.mkdir(parents=True)
+    (pdf / "ann-1.pdf").write_bytes(b"%PDF" + b"x" * 100)
+    (corpus / "600519.jsonl").write_text(
+        json.dumps({"document_id": "cninfo:ann-1", "security_id": "SSE:600519"}) + "\n",
+        encoding="utf-8",
+    )
+    assert corpus_has_annual_pdf(corpus, "600519.SH")
+    assert not corpus_has_annual_pdf(corpus, "000001.SZ")
+
+    syms = tmp_path / "syms.txt"
+    syms.write_text("# comment\n600519.SH\n\n000001.SZ\n600519.SH\n", encoding="utf-8")
+    assert symbols_from_text_file(syms) == ["600519.SH", "000001.SZ"]

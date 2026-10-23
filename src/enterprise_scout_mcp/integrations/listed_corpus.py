@@ -7,13 +7,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
+from enterprise_scout_mcp.integrations.listed_equity_extract import (
+    CONTROL_MATCH_KEYS,
+    HOLDERS_MATCH_KEYS,
+    SUBSIDIARIES_MATCH_KEYS,
+)
 from enterprise_scout_mcp.output.listed_schema import (
     facts_row,
     holders_row,
     identity_row,
+    listed_control_row,
     segments_row,
+    subsidiaries_row,
 )
-from enterprise_scout_mcp.output.listed_writer import append_listed_rows
+from enterprise_scout_mcp.output.listed_writer import append_listed_rows, replace_listed_rows
 
 
 def _iter_records(path: Path) -> Iterator[dict[str, Any]]:
@@ -161,7 +168,59 @@ def record_to_rows(record: dict[str, Any], *, collected_at: str) -> dict[str, li
             )
         )
 
-    return {"identity": identity, "facts": facts, "segments": segments, "holders": holders}
+    subsidiaries: list[dict[str, Any]] = []
+    for sub in record.get("subsidiaries") or []:
+        if not isinstance(sub, dict):
+            continue
+        name = str(sub.get("name") or "").strip()
+        if not name or not issuer_id or not period:
+            continue
+        subsidiaries.append(
+            subsidiaries_row(
+                issuer_id=issuer_id,
+                period=period,
+                name=name,
+                direct_pct=str(sub.get("direct_pct") or ""),
+                consolidated=str(sub.get("consolidated") or "true"),
+                main_business=str(sub.get("main_business") or ""),
+                document_id=str(sub.get("document_id") or document_id),
+                collected_at=collected_at,
+            )
+        )
+
+    listed_control: list[dict[str, Any]] = []
+    for hop in record.get("listed_control") or []:
+        if not isinstance(hop, dict):
+            continue
+        src = str(hop.get("src_name") or "").strip()
+        dst = str(hop.get("dst_name") or "").strip()
+        as_of = str(hop.get("as_of") or document_date or "").strip()[:10]
+        if not src or not dst or not issuer_id or not as_of:
+            continue
+        listed_control.append(
+            listed_control_row(
+                issuer_id=issuer_id,
+                as_of=as_of,
+                hop=str(hop.get("hop") or ""),
+                src_name=src,
+                dst_name=dst,
+                ratio=str(hop.get("ratio") or ""),
+                ratio_kind=str(hop.get("ratio_kind") or "ownership"),
+                is_concert_party=str(hop.get("is_concert_party") or "false"),
+                endpoint_type=str(hop.get("endpoint_type") or ""),
+                document_id=str(hop.get("document_id") or document_id),
+                collected_at=collected_at,
+            )
+        )
+
+    return {
+        "identity": identity,
+        "facts": facts,
+        "segments": segments,
+        "holders": holders,
+        "subsidiaries": subsidiaries,
+        "listed_control": listed_control,
+    }
 
 
 def import_listed_corpus(
@@ -180,6 +239,8 @@ def import_listed_corpus(
         "facts": 0,
         "segments": 0,
         "holders": 0,
+        "subsidiaries": 0,
+        "listed_control": 0,
         "dry_run": dry_run,
         "skipped": [],
     }
@@ -191,7 +252,10 @@ def import_listed_corpus(
     identity_rows: list[dict[str, Any]] = []
     facts_rows: list[dict[str, Any]] = []
     segment_rows: list[dict[str, Any]] = []
-    holder_rows: list[dict[str, Any]] = []
+    holder_n = 0
+    sub_n = 0
+    control_n = 0
+    equity_parts: list[dict[str, list[dict[str, Any]]]] = []
 
     paths = sorted(corpus_dir.glob("*.json")) + sorted(corpus_dir.glob("*.jsonl"))
     report["files"] = len(paths)
@@ -201,18 +265,30 @@ def import_listed_corpus(
         for record in _iter_records(path):
             report["records"] += 1
             parts = record_to_rows(record, collected_at=collected_at)
-            if not parts["identity"] and not parts["facts"] and not parts["holders"]:
+            if (
+                not parts["identity"]
+                and not parts["facts"]
+                and not parts["holders"]
+                and not parts["subsidiaries"]
+                and not parts["listed_control"]
+            ):
                 report["skipped"].append(f"{path.name}:no_identity_or_facts")
                 continue
             identity_rows.extend(parts["identity"])
             facts_rows.extend(parts["facts"])
             segment_rows.extend(parts["segments"])
-            holder_rows.extend(parts["holders"])
+            holder_n += len(parts["holders"])
+            sub_n += len(parts["subsidiaries"])
+            control_n += len(parts["listed_control"])
+            if parts["holders"] or parts["subsidiaries"] or parts["listed_control"]:
+                equity_parts.append(parts)
 
     report["identity"] = len(identity_rows)
     report["facts"] = len(facts_rows)
     report["segments"] = len(segment_rows)
-    report["holders"] = len(holder_rows)
+    report["holders"] = holder_n
+    report["subsidiaries"] = sub_n
+    report["listed_control"] = control_n
     if dry_run:
         return report
 
@@ -222,6 +298,27 @@ def import_listed_corpus(
         append_listed_rows(warehouse_dir, "facts", facts_rows)
     if segment_rows:
         append_listed_rows(warehouse_dir, "segments", segment_rows)
-    if holder_rows:
-        append_listed_rows(warehouse_dir, "holders", holder_rows)
+    # Per-record replace so later corpus files overwrite the same key cleanly.
+    for parts in equity_parts:
+        if parts["holders"]:
+            replace_listed_rows(
+                warehouse_dir,
+                "holders",
+                parts["holders"],
+                match_keys=HOLDERS_MATCH_KEYS,
+            )
+        if parts["subsidiaries"]:
+            replace_listed_rows(
+                warehouse_dir,
+                "subsidiaries",
+                parts["subsidiaries"],
+                match_keys=SUBSIDIARIES_MATCH_KEYS,
+            )
+        if parts["listed_control"]:
+            replace_listed_rows(
+                warehouse_dir,
+                "listed_control",
+                parts["listed_control"],
+                match_keys=CONTROL_MATCH_KEYS,
+            )
     return report

@@ -25,6 +25,19 @@ def test_record_to_rows_builds_identity_facts_segments() -> None:
             {"item_code": "cfo", "statement": "cashflow", "value": "20"},
         ],
         "segments": [{"kind": "product", "name": "A", "revenue": "70", "cost": "40"}],
+        "subsidiaries": [
+            {"name": "子一", "direct_pct": "100", "consolidated": "true"},
+        ],
+        "listed_control": [
+            {
+                "as_of": "2025-03-31",
+                "hop": "1",
+                "src_name": "国资委",
+                "dst_name": "Demo",
+                "ratio": "51",
+                "endpoint_type": "state",
+            }
+        ],
     }
     parts = record_to_rows(record, collected_at="2026-01-01T00:00:00+00:00")
     assert len(parts["identity"]) == 1
@@ -32,6 +45,8 @@ def test_record_to_rows_builds_identity_facts_segments() -> None:
     assert len(parts["facts"]) == 2
     assert parts["facts"][0]["document_date"] == "2025-03-31"
     assert len(parts["segments"]) == 1
+    assert len(parts["subsidiaries"]) == 1
+    assert len(parts["listed_control"]) == 1
 
 
 def test_import_listed_corpus_writes_parquet(tmp_path: Path) -> None:

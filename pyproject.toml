@@ -31,6 +31,9 @@ captcha = [
 warehouse = [
     "pyarrow>=18.0.0,<22",
 ]
+pdf = [
+    "pdfplumber>=0.11.0,<0.12",
+]
 graph = [
     "neo4j>=5.28.0,<6",
     "pyarrow>=18.0.0,<22",

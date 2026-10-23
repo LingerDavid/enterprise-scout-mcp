@@ -467,8 +467,57 @@ def cmd_corpus_import_listed(args: argparse.Namespace) -> int:
     return 0 if report.get("records", 0) or report.get("dry_run") else 1
 
 
+def cmd_corpus_extract_equity(args: argparse.Namespace) -> int:
+    """Re-extract equity tables from an on-disk annual PDF (no download)."""
+    from enterprise_scout_mcp.config import resolve_project_root
+    from enterprise_scout_mcp.integrations.listed_equity_extract import extract_and_store_equity
+    from enterprise_scout_mcp.sources.cninfo import resolve_listing
+
+    config = load_config(args.config)
+    root = resolve_project_root()
+
+    def _dir(rel: str) -> Path:
+        p = Path(rel)
+        return p if p.is_absolute() else root / p
+
+    listing = resolve_listing(args.symbol)
+    if listing is None:
+        print(json.dumps({"skipped": ["unresolved_symbol"]}, ensure_ascii=False, indent=2))
+        return 1
+    security_id, code, _column = listing
+    exchange = security_id.split(":", 1)[0]
+    corpus_dir = Path(args.corpus_dir) if args.corpus_dir else _dir(config.integrations.corpus.listed_dir)
+    if not corpus_dir.is_absolute():
+        corpus_dir = root / corpus_dir
+    warehouse_dir = None if args.no_warehouse else _dir(config.output.warehouse_dir)
+    pdf_path = Path(args.pdf)
+    if not pdf_path.is_file():
+        alt = corpus_dir / "pdf" / args.pdf
+        if alt.is_file():
+            pdf_path = alt
+    report = extract_and_store_equity(
+        pdf_path,
+        security_id=security_id,
+        issuer_id=str(args.issuer_id or security_id),
+        issuer_name=str(args.issuer_name or ""),
+        exchange=exchange,
+        code=code,
+        document_id=str(args.document_id or f"local:{pdf_path.name}"),
+        document_date=str(args.document_date or ""),
+        title=str(args.title or ""),
+        year=args.year or None,
+        corpus_dir=None if args.no_corpus else corpus_dir,
+        warehouse_dir=warehouse_dir,
+        dry_run=bool(args.dry_run),
+    )
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    if report.get("skipped") and not report.get("holders") and not report.get("subsidiaries"):
+        return 1
+    return 0
+
+
 def cmd_corpus_sample_listed(args: argparse.Namespace) -> int:
-    """Index cninfo annual PDF + Eastmoney top-10 holders for one listing."""
+    """Index cninfo annual PDF + equity extract / Eastmoney holders for one listing."""
     from enterprise_scout_mcp.config import resolve_project_root
     from enterprise_scout_mcp.integrations.listed_sample import sample_listed_disclosure
 
@@ -738,9 +787,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     corpus_import.add_argument("--dry-run", action="store_true", help="Count rows without writing")
     corpus_import.set_defaults(func=cmd_corpus_import_listed, corpus_cmd="import-listed")
+    corpus_extract = corpus_sub.add_parser(
+        "extract-equity",
+        help="Extract holders/subsidiaries/control from an on-disk annual PDF",
+    )
+    corpus_extract.add_argument("symbol", help="600519.SH or SSE:600519")
+    corpus_extract.add_argument(
+        "--pdf",
+        required=True,
+        help="PDF path, or filename under corpus/pdf/",
+    )
+    corpus_extract.add_argument("--year", default="", help="Report period YYYY")
+    corpus_extract.add_argument("--document-id", default="", help="Stable document id")
+    corpus_extract.add_argument("--document-date", default="", help="YYYY-MM-DD announcement date")
+    corpus_extract.add_argument("--title", default="", help="Announcement title (period hint)")
+    corpus_extract.add_argument("--issuer-id", default="", help="Credit code (default security_id)")
+    corpus_extract.add_argument("--issuer-name", default="", help="Issuer display name")
+    corpus_extract.add_argument("--corpus-dir", default="", help="Override corpus.listed_dir")
+    corpus_extract.add_argument("--no-corpus", action="store_true", help="Skip corpus JSON write")
+    corpus_extract.add_argument("--no-warehouse", action="store_true", help="Skip warehouse write")
+    corpus_extract.add_argument("--dry-run", action="store_true", help="Extract without writing")
+    corpus_extract.set_defaults(func=cmd_corpus_extract_equity, corpus_cmd="extract-equity")
     corpus_sample = corpus_sub.add_parser(
         "sample-listed",
-        help="Sample one listing: cninfo annual PDF index + Eastmoney top-10 holders",
+        help="Sample one listing: cninfo annual PDF + equity extract (F10 fallback)",
     )
     corpus_sample.add_argument("symbol", help="600519.SH or SSE:600519")
     corpus_sample.add_argument("--year", default="", help="Prefer annual report title containing year")

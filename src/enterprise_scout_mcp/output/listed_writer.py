@@ -1,9 +1,9 @@
-"""Append listed-company rows to EnterpriseLake warehouse/listed/*/part.parquet."""
+"""Append / replace listed-company rows in EnterpriseLake warehouse parquet."""
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 
 from enterprise_scout_mcp.output.listed_schema import (
     CAPITAL_COLUMNS,
@@ -33,15 +33,24 @@ def listed_part_path(warehouse_dir: Path, table: str) -> Path:
     return warehouse_dir / "listed" / table / "part.parquet"
 
 
-def _normalize_rows(table: str, rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+def _columns_for(table: str) -> tuple[str, ...]:
     if table == "listed_control":
-        columns = LISTED_CONTROL_COLUMNS
-    else:
-        columns = _TABLE_COLUMNS[table]
+        return LISTED_CONTROL_COLUMNS
+    if table not in _TABLE_COLUMNS:
+        raise ValueError(f"unknown listed table: {table}")
+    return _TABLE_COLUMNS[table]
+
+
+def _normalize_rows(table: str, rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    columns = _columns_for(table)
     out: list[dict[str, Any]] = []
     for raw in rows:
         out.append({key: raw.get(key, "") for key in columns})
     return out
+
+
+def _row_key(row: dict[str, Any], match_keys: Sequence[str]) -> tuple[str, ...]:
+    return tuple(str(row.get(k) or "") for k in match_keys)
 
 
 def append_listed_rows(
@@ -66,4 +75,40 @@ def append_listed_rows(
         existing = pq.read_table(part_path)
         table_pa = pa.concat_tables([existing, table_pa])
     pq.write_table(table_pa, part_path)
+    return part_path
+
+
+def replace_listed_rows(
+    warehouse_dir: Path,
+    table: str,
+    rows: Iterable[dict[str, Any]],
+    *,
+    match_keys: Sequence[str],
+) -> Path | None:
+    """Drop existing rows whose key matches any incoming row, then write the new set.
+
+    Empty ``rows`` is a no-op (returns None). Keys with any empty component still match.
+    """
+    normalized = _normalize_rows(table, rows)
+    if not normalized:
+        return None
+    if not match_keys:
+        raise ValueError("match_keys required for replace")
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except ImportError:
+        return None
+
+    drop_keys = {_row_key(row, match_keys) for row in normalized}
+    kept: list[dict[str, Any]] = []
+    part_path = listed_part_path(warehouse_dir, table)
+    if part_path.is_file():
+        for old in pq.read_table(part_path).to_pylist():
+            if _row_key(old, match_keys) not in drop_keys:
+                kept.append({key: old.get(key, "") for key in _columns_for(table)})
+
+    merged = kept + normalized
+    part_path.parent.mkdir(parents=True, exist_ok=True)
+    pq.write_table(pa.Table.from_pylist(merged), part_path)
     return part_path
