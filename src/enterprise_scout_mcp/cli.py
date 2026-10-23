@@ -582,9 +582,42 @@ def cmd_corpus_sample_listed(args: argparse.Namespace) -> int:
         year=args.year or None,
         download=not args.no_download,
         dry_run=bool(args.dry_run),
+        prospectus_fallback=not args.no_prospectus_fallback,
     )
     print(json.dumps(report, ensure_ascii=False, indent=2))
     if report.get("skipped") and not report.get("picked") and not report.get("holders"):
+        return 1
+    return 0
+
+
+def cmd_corpus_sample_prospectus(args: argparse.Namespace) -> int:
+    """Download 招股说明书 and extract named suppliers into edges/equity."""
+    from enterprise_scout_mcp.config import resolve_project_root
+    from enterprise_scout_mcp.integrations.listed_prospectus import sample_prospectus_disclosure
+
+    config = load_config(args.config)
+    root = resolve_project_root()
+
+    def _dir(rel: str) -> Path:
+        p = Path(rel)
+        return p if p.is_absolute() else root / p
+
+    corpus_dir = Path(args.corpus_dir) if args.corpus_dir else _dir(config.integrations.corpus.listed_dir)
+    if not corpus_dir.is_absolute():
+        corpus_dir = root / corpus_dir
+    warehouse_dir = None if args.no_warehouse else _dir(config.output.warehouse_dir)
+    pdf_dir = Path(args.pdf_dir) if args.pdf_dir else corpus_dir / "pdf"
+    report = sample_prospectus_disclosure(
+        args.symbol,
+        corpus_dir=corpus_dir,
+        warehouse_dir=warehouse_dir,
+        pdf_dir=pdf_dir,
+        download=not args.no_download,
+        dry_run=bool(args.dry_run),
+        suppliers_only=not args.full_equity,
+    )
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    if report.get("skipped") and not report.get("suppliers") and not report.get("edges"):
         return 1
     return 0
 
@@ -873,7 +906,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     corpus_sample = corpus_sub.add_parser(
         "sample-listed",
-        help="Sample one listing: cninfo annual PDF + equity extract (F10 fallback)",
+        help="Sample one listing: cninfo annual PDF + equity extract (F10 / prospectus fallback)",
     )
     corpus_sample.add_argument("symbol", help="600519.SH or SSE:600519")
     corpus_sample.add_argument("--year", default="", help="Prefer annual report title containing year")
@@ -881,8 +914,29 @@ def build_parser() -> argparse.ArgumentParser:
     corpus_sample.add_argument("--pdf-dir", default="", help="PDF download directory (default corpus/pdf)")
     corpus_sample.add_argument("--no-download", action="store_true", help="Index only, skip PDF bytes")
     corpus_sample.add_argument("--no-warehouse", action="store_true", help="Write corpus JSONL only")
+    corpus_sample.add_argument(
+        "--no-prospectus-fallback",
+        action="store_true",
+        help="Do not fetch 招股说明书 when annual has no named suppliers",
+    )
     corpus_sample.add_argument("--dry-run", action="store_true", help="Query without writing")
     corpus_sample.set_defaults(func=cmd_corpus_sample_listed, corpus_cmd="sample-listed")
+    corpus_prospectus = corpus_sub.add_parser(
+        "sample-prospectus",
+        help="Download 招股说明书 and extract named suppliers into edges/equity",
+    )
+    corpus_prospectus.add_argument("symbol", help="600519.SH or SSE:600519")
+    corpus_prospectus.add_argument("--corpus-dir", default="", help="Override corpus.listed_dir")
+    corpus_prospectus.add_argument("--pdf-dir", default="", help="PDF download directory")
+    corpus_prospectus.add_argument("--no-download", action="store_true", help="Index only")
+    corpus_prospectus.add_argument("--no-warehouse", action="store_true", help="Corpus JSON only")
+    corpus_prospectus.add_argument(
+        "--full-equity",
+        action="store_true",
+        help="Also extract subsidiaries/invest (default: suppliers only)",
+    )
+    corpus_prospectus.add_argument("--dry-run", action="store_true", help="Query without writing")
+    corpus_prospectus.set_defaults(func=cmd_corpus_sample_prospectus, corpus_cmd="sample-prospectus")
     corpus_batch = corpus_sub.add_parser(
         "sample-listed-batch",
         help="Batch sample: cninfo annual PDF + Eastmoney top-10 (resumable)",

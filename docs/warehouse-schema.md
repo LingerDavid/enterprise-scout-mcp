@@ -65,7 +65,7 @@ Initialize corpus dirs: `escout corpus init`.
 
 ## edges/equity/part.parquet
 
-Extracted from ENScan-style nested sections: `partner` / `stockholder` / `holder` (股东→`holder`), `invest` / `holds` (投资/控股→`invest`), `branch`, `supplier` (→`supply`). Listed annual PDFs (`source_channel=annual_pdf`) also write `holder` / `invest` / `supply` from 前十名股东、子公司/参股、前五名供应商. ENScan 统一导出键为 `name` + `scale`（见 ENSMapLN）。
+Extracted from ENScan-style nested sections: `partner` / `stockholder` / `holder` (股东→`holder`), `invest` / `holds` (投资/控股→`invest`), `branch`, `supplier` (→`supply`). Listed annual PDFs (`source_channel=annual_pdf`) also write `holder` / `invest` / `supply` from 前十名股东、子公司/参股、前五名供应商. When the annual only discloses aggregate 前五名采购额, `sample-listed` may fall back to 招股说明书 (`source_channel=prospectus_pdf`) for named suppliers. ENScan 统一导出键为 `name` + `scale`（见 ENSMapLN）。
 
 | Column | Type | Description |
 |--------|------|-------------|

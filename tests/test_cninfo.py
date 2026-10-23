@@ -7,6 +7,7 @@ from enterprise_scout_mcp.sources.cninfo import (
     announcement_query_form,
     org_id_from_catalog,
     pick_annual_report,
+    pick_prospectus,
     resolve_listing,
 )
 
@@ -85,3 +86,43 @@ def test_pick_annual_prefers_full_report() -> None:
     assert picked.announcement_id == "2"
     assert picked.document_id == "cninfo:2"
     assert picked.pdf_url.endswith("b.pdf")
+
+
+def test_pick_prospectus_skips_abstract_and_opinion() -> None:
+    anns = [
+        CninfoAnnouncement(
+            announcement_id="abs",
+            title="首次公开发行股票招股说明书摘要",
+            adjunct_url="a.pdf",
+            announce_time_ms=300,
+            security_id="SZSE:301000",
+            code="301000",
+        ),
+        CninfoAnnouncement(
+            announcement_id="op",
+            title="招股说明书的确认意见",
+            adjunct_url="b.pdf",
+            announce_time_ms=200,
+            security_id="SZSE:301000",
+            code="301000",
+        ),
+        CninfoAnnouncement(
+            announcement_id="draft",
+            title="首次公开发行股票并在创业板上市招股说明书注册稿",
+            adjunct_url="d.pdf",
+            announce_time_ms=250,
+            security_id="SZSE:301000",
+            code="301000",
+        ),
+        CninfoAnnouncement(
+            announcement_id="full",
+            title="首次公开发行股票并在创业板上市招股说明书",
+            adjunct_url="c.pdf",
+            announce_time_ms=100,
+            security_id="SZSE:301000",
+            code="301000",
+        ),
+    ]
+    picked = pick_prospectus(anns)
+    assert picked is not None
+    assert picked.announcement_id == "full"

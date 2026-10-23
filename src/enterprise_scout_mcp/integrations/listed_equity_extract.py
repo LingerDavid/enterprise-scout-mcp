@@ -21,6 +21,7 @@ SUBSIDIARIES_MATCH_KEYS = ("issuer_id", "period", "document_id")
 CONTROL_MATCH_KEYS = ("issuer_id", "as_of", "document_id")
 
 ANNUAL_PDF_CHANNEL = "annual_pdf"
+PROSPECTUS_PDF_CHANNEL = "prospectus_pdf"
 ANNUAL_PDF_PLATFORM = "cninfo"
 
 
@@ -75,107 +76,138 @@ def edges_from_equity_extract(
     issuer_name: str,
     credit_code: str = "",
     collected_at: str = "",
+    source_channel: str = ANNUAL_PDF_CHANNEL,
+    include: frozenset[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Map PDF extract rows → ``edges/equity`` shape for the lake graph.
 
     Directions match ENScan extract: holder→issuer, issuer→investee/supplier.
+    ``include`` limits sections: ``holders`` / ``subsidiaries`` / ``investments`` /
+    ``suppliers`` (default: all present).
     """
     root = str(issuer_name or "").strip()
     if not root:
         return []
+    want = include or frozenset({"holders", "subsidiaries", "investments", "suppliers"})
+    channel = str(source_channel or ANNUAL_PDF_CHANNEL).strip() or ANNUAL_PDF_CHANNEL
     ts = collected_at or datetime.now(timezone.utc).isoformat()
     code = str(credit_code or "").strip()
     edges: list[dict[str, Any]] = []
 
-    for h in result.holders:
-        name = str(h.get("holder_name") or "").strip()
-        if not name:
-            continue
-        pct = str(h.get("pct_total") or "").strip()
-        ratio = f"{pct}%" if pct and "%" not in pct else pct
-        edges.append(
-            edge_row(
-                src_name=name,
-                dst_name=root,
-                relation="holder",
-                ratio=ratio,
-                section="holders",
-                platform=ANNUAL_PDF_PLATFORM,
-                source_channel=ANNUAL_PDF_CHANNEL,
-                query_keyword=root,
-                collected_at=ts,
-                credit_code=code,
-                payload_json=json.dumps(h, ensure_ascii=False),
+    if "holders" in want:
+        for h in result.holders:
+            name = str(h.get("holder_name") or "").strip()
+            if not name:
+                continue
+            pct = str(h.get("pct_total") or "").strip()
+            ratio = f"{pct}%" if pct and "%" not in pct else pct
+            edges.append(
+                edge_row(
+                    src_name=name,
+                    dst_name=root,
+                    relation="holder",
+                    ratio=ratio,
+                    section="holders",
+                    platform=ANNUAL_PDF_PLATFORM,
+                    source_channel=channel,
+                    query_keyword=root,
+                    collected_at=ts,
+                    credit_code=code,
+                    payload_json=json.dumps(h, ensure_ascii=False),
+                )
             )
-        )
 
-    for s in result.subsidiaries:
-        name = str(s.get("name") or "").strip()
-        if not name:
-            continue
-        pct = str(s.get("direct_pct") or "").strip()
-        ratio = f"{pct}%" if pct and "%" not in pct else pct
-        edges.append(
-            edge_row(
-                src_name=root,
-                dst_name=name,
-                relation="invest",
-                ratio=ratio,
-                section="subsidiaries",
-                platform=ANNUAL_PDF_PLATFORM,
-                source_channel=ANNUAL_PDF_CHANNEL,
-                query_keyword=root,
-                collected_at=ts,
-                credit_code=code,
-                payload_json=json.dumps(s, ensure_ascii=False),
+    if "subsidiaries" in want:
+        for s in result.subsidiaries:
+            name = str(s.get("name") or "").strip()
+            if not name:
+                continue
+            pct = str(s.get("direct_pct") or "").strip()
+            ratio = f"{pct}%" if pct and "%" not in pct else pct
+            edges.append(
+                edge_row(
+                    src_name=root,
+                    dst_name=name,
+                    relation="invest",
+                    ratio=ratio,
+                    section="subsidiaries",
+                    platform=ANNUAL_PDF_PLATFORM,
+                    source_channel=channel,
+                    query_keyword=root,
+                    collected_at=ts,
+                    credit_code=code,
+                    payload_json=json.dumps(s, ensure_ascii=False),
+                )
             )
-        )
 
-    for inv in result.investments:
-        name = str(inv.get("name") or "").strip()
-        if not name:
-            continue
-        pct = str(inv.get("direct_pct") or "").strip()
-        ratio = f"{pct}%" if pct and "%" not in pct else pct
-        edges.append(
-            edge_row(
-                src_name=root,
-                dst_name=name,
-                relation="invest",
-                ratio=ratio,
-                section="investments",
-                platform=ANNUAL_PDF_PLATFORM,
-                source_channel=ANNUAL_PDF_CHANNEL,
-                query_keyword=root,
-                collected_at=ts,
-                credit_code=code,
-                payload_json=json.dumps(inv, ensure_ascii=False),
+    if "investments" in want:
+        for inv in result.investments:
+            name = str(inv.get("name") or "").strip()
+            if not name:
+                continue
+            pct = str(inv.get("direct_pct") or "").strip()
+            ratio = f"{pct}%" if pct and "%" not in pct else pct
+            edges.append(
+                edge_row(
+                    src_name=root,
+                    dst_name=name,
+                    relation="invest",
+                    ratio=ratio,
+                    section="investments",
+                    platform=ANNUAL_PDF_PLATFORM,
+                    source_channel=channel,
+                    query_keyword=root,
+                    collected_at=ts,
+                    credit_code=code,
+                    payload_json=json.dumps(inv, ensure_ascii=False),
+                )
             )
-        )
 
-    for sup in result.suppliers:
-        name = str(sup.get("name") or "").strip()
-        if not name:
-            continue
-        pct = str(sup.get("purchase_pct") or "").strip()
-        ratio = f"{pct}%" if pct and "%" not in pct else pct
-        edges.append(
-            edge_row(
-                src_name=root,
-                dst_name=name,
-                relation="supply",
-                ratio=ratio,
-                section="suppliers",
-                platform=ANNUAL_PDF_PLATFORM,
-                source_channel=ANNUAL_PDF_CHANNEL,
-                query_keyword=root,
-                collected_at=ts,
-                credit_code=code,
-                payload_json=json.dumps(sup, ensure_ascii=False),
+    if "suppliers" in want:
+        for sup in result.suppliers:
+            name = str(sup.get("name") or "").strip()
+            if not name:
+                continue
+            pct = str(sup.get("purchase_pct") or "").strip()
+            ratio = f"{pct}%" if pct and "%" not in pct else pct
+            edges.append(
+                edge_row(
+                    src_name=root,
+                    dst_name=name,
+                    relation="supply",
+                    ratio=ratio,
+                    section="suppliers",
+                    platform=ANNUAL_PDF_PLATFORM,
+                    source_channel=channel,
+                    query_keyword=root,
+                    collected_at=ts,
+                    credit_code=code,
+                    payload_json=json.dumps(sup, ensure_ascii=False),
+                )
             )
-        )
 
     return edges
+
+
+def upsert_filing_edges_to_warehouse(
+    warehouse_dir: Path,
+    *,
+    issuer_name: str,
+    edges: list[dict[str, Any]],
+    source_channel: str = ANNUAL_PDF_CHANNEL,
+) -> str | None:
+    """Replace prior edges for (issuer, source_channel), then write ``edges``."""
+    root = str(issuer_name or "").strip()
+    channel = str(source_channel or "").strip()
+    if not root or not channel:
+        return None
+    path = replace_edges_for_source(
+        Path(warehouse_dir),
+        edges,
+        query_keyword=root,
+        source_channel=channel,
+    )
+    return str(path) if path else None
 
 
 def upsert_annual_edges_to_warehouse(
@@ -185,16 +217,12 @@ def upsert_annual_edges_to_warehouse(
     edges: list[dict[str, Any]],
 ) -> str | None:
     """Replace prior annual_pdf edges for this issuer, then write ``edges``."""
-    root = str(issuer_name or "").strip()
-    if not root:
-        return None
-    path = replace_edges_for_source(
-        Path(warehouse_dir),
-        edges,
-        query_keyword=root,
+    return upsert_filing_edges_to_warehouse(
+        warehouse_dir,
+        issuer_name=issuer_name,
+        edges=edges,
         source_channel=ANNUAL_PDF_CHANNEL,
     )
-    return str(path) if path else None
 
 
 def _pdf_for_corpus_record(corpus_dir: Path, record: dict[str, Any]) -> Path | None:

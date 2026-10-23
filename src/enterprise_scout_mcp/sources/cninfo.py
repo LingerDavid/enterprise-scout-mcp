@@ -29,6 +29,9 @@ CATEGORY_ANNUAL = "category_ndbg_szsh;"
 CATEGORY_INTERIM = "category_bndbg_szsh;"
 CATEGORY_Q1 = "category_yjdbg_szsh;"
 CATEGORY_Q3 = "category_sjdbg_szsh;"
+# IPO / prospectus (招股说明书) — used when annual lacks named suppliers.
+CATEGORY_IPO = "category_sf_szsh;"
+CATEGORY_PROSPECTUS = "category_scgkfx_szsh;"
 
 _SUFFIX_COLUMN = {"SH": "sse", "SZ": "szse", "BJ": "bj"}
 _SUFFIX_EXCHANGE = {"SH": "SSE", "SZ": "SZSE", "BJ": "BSE"}
@@ -257,6 +260,10 @@ def query_announcements(
 
 
 _ANNUAL_TITLE = re.compile(r"年度报告(?!摘要)|年报(?!摘要)")
+_PROSPECTUS_TITLE = re.compile(
+    r"招股说明书|招股意向书|首次公开发行股票.*招股",
+    re.I,
+)
 
 
 def pick_annual_report(
@@ -278,6 +285,37 @@ def pick_annual_report(
     if not pool:
         return None
     return max(pool, key=lambda a: a.announce_time_ms)
+
+
+def _prospectus_rank(ann: CninfoAnnouncement) -> tuple[int, int, int]:
+    """Higher is better: final prospectus > drafts; then newer; then longer title."""
+    title = ann.title or ""
+    draft_penalty = 0
+    for bad in ("注册稿", "申报稿", "上会稿", "征求意见稿", "（一）", "(一)", "之一"):
+        if bad in title:
+            draft_penalty -= 10
+    if "招股说明书" in title and draft_penalty == 0:
+        draft_penalty += 5
+    return (draft_penalty, ann.announce_time_ms, len(title))
+
+
+def pick_prospectus(
+    announcements: list[CninfoAnnouncement],
+) -> CninfoAnnouncement | None:
+    """Prefer full 招股说明书 PDF; skip abstracts / confirmation / English."""
+    candidates = [a for a in announcements if a.adjunct_url]
+    full = [
+        a
+        for a in candidates
+        if _PROSPECTUS_TITLE.search(a.title)
+        and "摘要" not in a.title
+        and "确认意见" not in a.title
+        and "英文" not in a.title
+        and "提示性" not in a.title
+    ]
+    if not full:
+        return None
+    return max(full, key=_prospectus_rank)
 
 
 def download_pdf(

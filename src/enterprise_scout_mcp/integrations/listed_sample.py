@@ -45,9 +45,13 @@ def sample_listed_disclosure(
     year: str | int | None = None,
     download: bool = True,
     dry_run: bool = False,
+    prospectus_fallback: bool = True,
     client: httpx.Client | None = None,
 ) -> dict[str, Any]:
-    """Index annual report + PDF equity extract; F10 holders if PDF extract misses."""
+    """Index annual report + PDF equity extract; F10 holders if PDF extract misses.
+
+    When annual PDF has no named suppliers, optionally fall back to 招股说明书.
+    """
     collected_at = datetime.now(timezone.utc).isoformat()
     listing = resolve_listing(symbol_or_security)
     report: dict[str, Any] = {
@@ -67,6 +71,7 @@ def sample_listed_disclosure(
         "period": "",
         "corpus_path": None,
         "equity_extract": None,
+        "prospectus_fallback": None,
         "dry_run": dry_run,
         "skipped": [],
     }
@@ -305,6 +310,36 @@ def sample_listed_disclosure(
                 issuer_name=issuer_name,
                 edges=annual_edges,
             )
+
+    if (
+        prospectus_fallback
+        and not dry_run
+        and not suppliers
+        and download
+    ):
+        from enterprise_scout_mcp.integrations.listed_prospectus import (
+            maybe_fallback_prospectus_suppliers,
+        )
+
+        fb = maybe_fallback_prospectus_suppliers(
+            symbol_or_security=symbol_or_security,
+            annual_suppliers=suppliers,
+            corpus_dir=Path(corpus_dir),
+            warehouse_dir=warehouse_dir,
+            pdf_dir=pdf_dir,
+            client=client,
+            enabled=True,
+        )
+        if fb is not None:
+            report["prospectus_fallback"] = {
+                "suppliers": fb.get("suppliers", 0),
+                "edges": fb.get("edges", 0),
+                "document_id": (fb.get("picked") or {}).get("document_id"),
+                "skipped": fb.get("skipped") or [],
+                "corpus_path": fb.get("corpus_path"),
+            }
+            if fb.get("suppliers"):
+                report["suppliers"] = int(fb.get("suppliers") or 0)
 
     return report
 
