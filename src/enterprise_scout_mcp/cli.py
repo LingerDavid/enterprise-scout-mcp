@@ -511,9 +511,50 @@ def cmd_corpus_extract_equity(args: argparse.Namespace) -> int:
         dry_run=bool(args.dry_run),
     )
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    if report.get("skipped") and not report.get("holders") and not report.get("subsidiaries"):
+    if report.get("skipped") and not (
+        report.get("holders")
+        or report.get("subsidiaries")
+        or report.get("suppliers")
+        or report.get("investments")
+        or report.get("edges")
+    ):
         return 1
     return 0
+
+
+def cmd_corpus_reextract_equity_batch(args: argparse.Namespace) -> int:
+    """Re-extract annual PDFs already in corpus → listed tables + edges/equity."""
+    from enterprise_scout_mcp.config import resolve_project_root
+    from enterprise_scout_mcp.integrations.listed_equity_extract import (
+        batch_reextract_listed_equity,
+    )
+
+    config = load_config(args.config)
+    root = resolve_project_root()
+
+    def _dir(rel: str) -> Path:
+        p = Path(rel)
+        return p if p.is_absolute() else root / p
+
+    corpus_dir = Path(args.corpus_dir) if args.corpus_dir else _dir(config.integrations.corpus.listed_dir)
+    if not corpus_dir.is_absolute():
+        corpus_dir = root / corpus_dir
+    warehouse_dir = None if args.no_warehouse else _dir(config.output.warehouse_dir)
+    progress = (
+        Path(args.progress)
+        if args.progress
+        else corpus_dir / "_reextract_equity_batch.jsonl"
+    )
+    summary = batch_reextract_listed_equity(
+        corpus_dir,
+        warehouse_dir=warehouse_dir,
+        progress_path=progress,
+        limit=int(args.limit),
+        skip_ok=not args.no_skip_ok,
+        dry_run=bool(args.dry_run),
+    )
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0 if summary.get("failed", 0) == 0 else 1
 
 
 def cmd_corpus_sample_listed(args: argparse.Namespace) -> int:
@@ -789,7 +830,7 @@ def build_parser() -> argparse.ArgumentParser:
     corpus_import.set_defaults(func=cmd_corpus_import_listed, corpus_cmd="import-listed")
     corpus_extract = corpus_sub.add_parser(
         "extract-equity",
-        help="Extract holders/subsidiaries/control from an on-disk annual PDF",
+        help="Extract holders/subsidiaries/suppliers/invest/control from an on-disk annual PDF",
     )
     corpus_extract.add_argument("symbol", help="600519.SH or SSE:600519")
     corpus_extract.add_argument(
@@ -808,6 +849,28 @@ def build_parser() -> argparse.ArgumentParser:
     corpus_extract.add_argument("--no-warehouse", action="store_true", help="Skip warehouse write")
     corpus_extract.add_argument("--dry-run", action="store_true", help="Extract without writing")
     corpus_extract.set_defaults(func=cmd_corpus_extract_equity, corpus_cmd="extract-equity")
+    corpus_reextract = corpus_sub.add_parser(
+        "reextract-equity-batch",
+        help="Re-extract corpus annual PDFs → listed parquet + edges/equity (supply/invest)",
+    )
+    corpus_reextract.add_argument("--corpus-dir", default="", help="Override corpus.listed_dir")
+    corpus_reextract.add_argument(
+        "--progress",
+        default="",
+        help="Resume JSONL (default corpus/_reextract_equity_batch.jsonl)",
+    )
+    corpus_reextract.add_argument("--limit", type=int, default=0, help="Max records (0=all)")
+    corpus_reextract.add_argument(
+        "--no-skip-ok",
+        action="store_true",
+        help="Re-process symbols already ok in progress",
+    )
+    corpus_reextract.add_argument("--no-warehouse", action="store_true", help="Corpus JSON only")
+    corpus_reextract.add_argument("--dry-run", action="store_true", help="Extract without writing")
+    corpus_reextract.set_defaults(
+        func=cmd_corpus_reextract_equity_batch,
+        corpus_cmd="reextract-equity-batch",
+    )
     corpus_sample = corpus_sub.add_parser(
         "sample-listed",
         help="Sample one listing: cninfo annual PDF + equity extract (F10 fallback)",

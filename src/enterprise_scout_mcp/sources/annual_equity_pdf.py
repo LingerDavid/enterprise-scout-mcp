@@ -27,6 +27,18 @@ _SUB_TITLE = re.compile(
     r"重要子公司|纳入合并范围的子公司|在子公司中的权益|合并范围内子公司",
     re.I,
 )
+_SUPPLIER_TITLE = re.compile(
+    r"前\s*五\s*名\s*供\s*应\s*商|主要供应商|向前五名供应商|前5名供应商|"
+    r"前五名供应商情况|公司前五名供应商",
+    re.I,
+)
+# Outbound equity invest / associates — exclude pure 子公司 seed pages.
+_INVEST_TITLE = re.compile(
+    r"对外股权投资|主要参股|合营企业和联营企业|合营及联营企业|"
+    r"对联营企业和合营企业|长期股权投资|重要的合营企业|重要的联营企业|"
+    r"在合营企业和联营企业中的权益|合营或联营",
+    re.I,
+)
 _CONTROL_TITLE = re.compile(r"实际控制人|控股股东|股权结构", re.I)
 _DIAGRAM_HINT = re.compile(r"股权结构图|见下图|如下图|示意图", re.I)
 
@@ -35,6 +47,8 @@ _PCT_CELL = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*%?\s*$")
 _SHARES_CELL = re.compile(r"^\s*[\d,]+(?:\.\d+)?\s*$")
 
 _MAX_SUBSIDIARIES = 80
+_MAX_SUPPLIERS = 10
+_MAX_INVESTMENTS = 80
 
 _HOLDER_NAME_HINTS = ("股东名称", "股东姓名")
 _HOLDER_PCT_HINTS = ("持股比例", "占总股本比例", "比例(%)", "比例（%）", "比例")
@@ -43,6 +57,29 @@ _HOLDER_TYPE_HINTS = ("股东性质", "股份性质")
 _SUB_NAME_HINTS = ("子公司名称", "公司名称", "企业名称")
 _SUB_PCT_HINTS = ("持股比例", "直接持股", "权益比例", "比例")
 _SUB_BIZ_HINTS = ("主营业务", "主要业务", "经营范围")
+_SUPPLIER_NAME_HINTS = ("供应商名称", "供应商")
+_SUPPLIER_PCT_HINTS = (
+    "占年度采购总额",
+    "占采购总额比例",
+    "占采购总额",
+    "采购比例",
+    "比例(%)",
+    "比例（%）",
+    "占比",
+    "比例",
+)
+_SUPPLIER_AMT_HINTS = ("采购额", "采购金额", "金额")
+_INVEST_NAME_HINTS = (
+    "被投资单位",
+    "被投资企业名称",
+    "被投资企业",
+    "联营企业名称",
+    "合营企业名称",
+    "企业名称",
+    "公司名称",
+)
+_INVEST_PCT_HINTS = ("持股比例", "投资比例", "直接持股", "权益比例", "占股比例", "比例")
+_INVEST_BIZ_HINTS = ("主营业务", "主要业务", "经营范围", "主要经营活动")
 
 
 @dataclass
@@ -59,6 +96,8 @@ class EquityExtractResult:
     holders: list[dict[str, Any]] = field(default_factory=list)
     subsidiaries: list[dict[str, Any]] = field(default_factory=list)
     listed_control: list[dict[str, Any]] = field(default_factory=list)
+    suppliers: list[dict[str, Any]] = field(default_factory=list)
+    investments: list[dict[str, Any]] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
     page_hits: dict[str, list[int]] = field(default_factory=dict)
 
@@ -179,6 +218,72 @@ def _pick_first_sub_table(
             if len(tbl) >= 2:
                 return tbl, [page.index]
     return None, []
+
+
+def _pick_first_titled_table(
+    pages: Sequence[PageContent],
+    title_re: re.Pattern[str],
+) -> tuple[list[list[str]] | None, list[int]]:
+    for page in pages:
+        if not _table_has_title_nearby(page.text, title_re):
+            continue
+        for tbl in page.tables:
+            if len(tbl) >= 2:
+                return tbl, [page.index]
+    return None, []
+
+
+def _collect_titled_tables(
+    pages: Sequence[PageContent],
+    title_re: re.Pattern[str],
+) -> tuple[list[list[list[str]]], list[int]]:
+    """All tables on pages whose text matches ``title_re``."""
+    tables: list[list[list[str]]] = []
+    hits: list[int] = []
+    for page in pages:
+        if not _table_has_title_nearby(page.text, title_re):
+            continue
+        hits.append(page.index)
+        for tbl in page.tables:
+            if len(tbl) >= 2:
+                tables.append(tbl)
+    return tables, hits
+
+
+def _header_blob(table: list[list[str]], rows: int = 2) -> str:
+    parts: list[str] = []
+    for raw in table[:rows]:
+        parts.extend(_cell(c) for c in raw)
+    return "".join(parts)
+
+
+def _collect_invest_candidate_tables(
+    pages: Sequence[PageContent],
+) -> tuple[list[list[list[str]]], list[int]]:
+    """Tables that look like outbound invest / associates (header-driven)."""
+    tables: list[list[list[str]]] = []
+    hits: list[int] = []
+    seen: set[int] = set()
+    for page in pages:
+        title_hit = _table_has_title_nearby(page.text, _INVEST_TITLE) or (
+            "长期股权投资" in (page.text or "") or "被投资单位" in (page.text or "")
+        )
+        for tbl in page.tables:
+            if len(tbl) < 2:
+                continue
+            blob = _header_blob(tbl)
+            is_investee = "被投资单位" in blob or "被投资企业" in blob
+            headers = [_cell(c) for c in tbl[0]]
+            name_i = _find_col(headers, ("公司名称", "企业名称"))
+            pct_i = _find_col(headers, ("投资比例", "持股比例"))
+            is_named_stake = title_hit and name_i is not None and pct_i is not None
+            if not (is_investee or is_named_stake):
+                continue
+            tables.append(tbl)
+            if page.index not in seen:
+                hits.append(page.index)
+                seen.add(page.index)
+    return tables, hits
 
 
 def _is_holder_noise_name(name: str) -> bool:
@@ -365,6 +470,161 @@ def _rows_from_sub_table(
     return out
 
 
+def _is_noise_entity_name(name: str) -> bool:
+    n = _cell(name)
+    if not n or len(n) < 2:
+        return True
+    if n in {"合计", "小计", "其他", "其它"}:
+        return True
+    if n.startswith(("前五", "前5", "序号", "供应商名称", "被投资")):
+        return True
+    # Section labels in long-equity notes: 一、合营企业 / 二、联营企业
+    if re.match(r"^[一二三四五六七八九十]+[、.．]", n):
+        return True
+    if n in {"合营企业", "联营企业", "子公司", "项目"}:
+        return True
+    return False
+
+
+def _table_headers(table: list[list[str]]) -> tuple[list[str], list[list[str]]]:
+    """Return header cells + body; stitch two header rows when needed."""
+    if not table:
+        return [], []
+    headers = [_cell(c) for c in table[0]]
+    body = table[1:]
+    if _find_col(headers, _INVEST_NAME_HINTS + _SUPPLIER_NAME_HINTS) is not None:
+        return headers, body
+    if len(table) >= 2:
+        stitched = []
+        row1 = table[1]
+        width = max(len(table[0]), len(row1))
+        for i in range(width):
+            a = _cell(table[0][i]) if i < len(table[0]) else ""
+            b = _cell(row1[i]) if i < len(row1) else ""
+            stitched.append((a + b).strip() or a or b)
+        if _find_col(stitched, _INVEST_NAME_HINTS + _SUPPLIER_NAME_HINTS) is not None:
+            return stitched, table[2:]
+    return headers, body
+
+
+def _rows_from_supplier_table(
+    table: list[list[str]],
+    *,
+    issuer_id: str,
+    period: str,
+    document_id: str,
+    collected_at: str,
+) -> list[dict[str, Any]]:
+    """Parse top suppliers → dict rows (name / purchase_pct / amount)."""
+    if not table or not issuer_id:
+        return []
+    headers, body = _table_headers(table)
+    name_i = _find_col(headers, _SUPPLIER_NAME_HINTS)
+    # Require an explicit 供应商 column — bare 名称 tables are not suppliers.
+    if name_i is None:
+        return []
+    name_hdr = _norm_header(headers[name_i])
+    if "供应商" not in name_hdr:
+        return []
+    pct_i = _find_col(headers, _SUPPLIER_PCT_HINTS)
+    amt_i = _find_col(headers, _SUPPLIER_AMT_HINTS)
+    out: list[dict[str, Any]] = []
+    for raw in body:
+        if len(out) >= _MAX_SUPPLIERS:
+            break
+        cells = [_cell(c) for c in raw]
+        if name_i >= len(cells):
+            continue
+        name = cells[name_i]
+        if _is_noise_entity_name(name):
+            continue
+        # Company-like names only (avoid "原材料" cost rows).
+        if not re.search(r"公司|厂|集团|合伙|企业|有限", name):
+            if len(name) < 4:
+                continue
+        pct = ""
+        if pct_i is not None and pct_i < len(cells):
+            pct = _parse_pct_percent(cells[pct_i], assume_percent=True)
+        amount = ""
+        if amt_i is not None and amt_i < len(cells):
+            amount = _cell(cells[amt_i]).replace(",", "")
+        out.append(
+            {
+                "issuer_id": issuer_id,
+                "period": period,
+                "rank": str(len(out) + 1),
+                "name": name,
+                "purchase_pct": pct,
+                "purchase_amount": amount,
+                "document_id": document_id,
+                "collected_at": collected_at,
+            }
+        )
+    return out
+
+
+def _rows_from_invest_table(
+    table: list[list[str]],
+    *,
+    issuer_id: str,
+    period: str,
+    document_id: str,
+    collected_at: str,
+) -> list[dict[str, Any]]:
+    """Parse outbound equity invest / associate table (non-subsidiary seed)."""
+    if not table or not issuer_id or not period:
+        return []
+    headers, body = _table_headers(table)
+    name_i = _find_col(headers, _INVEST_NAME_HINTS)
+    pct_i = _find_col(headers, _INVEST_PCT_HINTS)
+    biz_i = _find_col(headers, _INVEST_BIZ_HINTS)
+    if name_i is None:
+        return []
+    out: list[dict[str, Any]] = []
+    for raw in body:
+        if len(out) >= _MAX_INVESTMENTS:
+            break
+        cells = [_cell(c) for c in raw]
+        if name_i >= len(cells):
+            continue
+        name = cells[name_i]
+        if _is_noise_entity_name(name):
+            continue
+        if not re.search(r"公司|厂|集团|合伙|企业|有限|中心", name):
+            continue
+        pct = ""
+        if pct_i is not None and pct_i < len(cells):
+            pct = _parse_pct_percent(cells[pct_i])
+        biz = ""
+        if biz_i is not None and biz_i < len(cells):
+            biz = cells[biz_i]
+        out.append(
+            {
+                "issuer_id": issuer_id,
+                "period": period,
+                "name": name,
+                "direct_pct": pct,
+                "main_business": biz,
+                "document_id": document_id,
+                "collected_at": collected_at,
+            }
+        )
+    return out
+
+
+def _dedupe_named_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep first row per normalized name."""
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        key = re.sub(r"\s+", "", str(row.get("name") or ""))
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(row)
+    return out
+
+
 def _extract_control_from_text(
     pages: Sequence[PageContent],
     *,
@@ -475,7 +735,7 @@ def extract_equity_from_pages(
     collected_at: str = "",
     issuer_name: str = "",
 ) -> EquityExtractResult:
-    """Extract holders / subsidiaries / control from in-memory pages."""
+    """Extract holders / subsidiaries / suppliers / invest / control from pages."""
     result = EquityExtractResult()
     if not security_id or not document_id:
         result.skipped.append("missing_ids")
@@ -518,6 +778,8 @@ def extract_equity_from_pages(
         result.skipped.append("no_holders_table")
     if not period:
         result.skipped.append("no_period_for_subsidiaries")
+        result.skipped.append("no_period_for_suppliers")
+        result.skipped.append("no_period_for_investments")
     else:
         sub_table, sub_pages = _pick_first_sub_table(pages)
         result.page_hits["subsidiaries"] = sub_pages
@@ -533,6 +795,47 @@ def extract_equity_from_pages(
             )
             if not result.subsidiaries:
                 result.skipped.append("subsidiaries_parse_failed")
+
+        sup_tables, sup_pages = _collect_titled_tables(pages, _SUPPLIER_TITLE)
+        result.page_hits["suppliers"] = sup_pages
+        if not sup_tables:
+            result.skipped.append("no_suppliers_table")
+        else:
+            best_sup: list[dict[str, Any]] = []
+            for tbl in sup_tables:
+                chunk = _rows_from_supplier_table(
+                    tbl,
+                    issuer_id=issuer_id,
+                    period=period,
+                    document_id=document_id,
+                    collected_at=collected_at,
+                )
+                if len(chunk) > len(best_sup):
+                    best_sup = chunk
+            result.suppliers = best_sup
+            if not result.suppliers:
+                # Many filings only disclose aggregate 前五名采购额, no named table.
+                result.skipped.append("suppliers_narrative_only")
+
+        inv_tables, inv_pages = _collect_invest_candidate_tables(pages)
+        result.page_hits["investments"] = inv_pages
+        if not inv_tables:
+            result.skipped.append("no_investments_table")
+        else:
+            merged_inv: list[dict[str, Any]] = []
+            for tbl in inv_tables:
+                merged_inv.extend(
+                    _rows_from_invest_table(
+                        tbl,
+                        issuer_id=issuer_id,
+                        period=period,
+                        document_id=document_id,
+                        collected_at=collected_at,
+                    )
+                )
+            result.investments = _dedupe_named_rows(merged_inv)[:_MAX_INVESTMENTS]
+            if not result.investments:
+                result.skipped.append("investments_parse_failed")
 
     if not issuer_id:
         result.skipped.append("no_issuer_for_control")

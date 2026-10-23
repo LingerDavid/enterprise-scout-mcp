@@ -35,6 +35,17 @@ def test_extract_holders_and_subsidiaries_from_pages() -> None:
         ["丙药业有限公司", "100%", "药品销售"],
         ["丁商贸有限公司", "60%", "批发"],
     ]
+    supplier_table = [
+        ["供应商名称", "采购金额", "占年度采购总额的比例"],
+        ["戊原料有限公司", "120000000", "18.50%"],
+        ["己包装有限公司", "80000000", "12.30"],
+        ["合计", "200000000", "30.80%"],
+    ]
+    invest_table = [
+        ["被投资单位", "持股比例", "主营业务"],
+        ["庚联营有限公司", "30%", "医药流通"],
+        ["辛合营有限公司", "49%", "研发"],
+    ]
     pages = [
         PageContent(
             index=10,
@@ -45,6 +56,16 @@ def test_extract_holders_and_subsidiaries_from_pages() -> None:
             index=40,
             text="重要子公司情况\n纳入合并范围的子公司如下",
             tables=[sub_table],
+        ),
+        PageContent(
+            index=55,
+            text="向前五名供应商合计采购金额情况\n主要供应商",
+            tables=[supplier_table],
+        ),
+        PageContent(
+            index=60,
+            text="对外股权投资情况\n重要的联营企业",
+            tables=[invest_table],
         ),
         PageContent(
             index=12,
@@ -68,6 +89,11 @@ def test_extract_holders_and_subsidiaries_from_pages() -> None:
     assert float(result.holders[0]["pct_total"]) == pytest.approx(32.5)
     assert len(result.subsidiaries) == 2
     assert result.subsidiaries[0]["consolidated"] == "true"
+    assert len(result.suppliers) == 2
+    assert result.suppliers[0]["name"] == "戊原料有限公司"
+    assert float(result.suppliers[0]["purchase_pct"]) == pytest.approx(18.5)
+    assert len(result.investments) == 2
+    assert result.investments[0]["name"] == "庚联营有限公司"
     assert result.listed_control
     assert result.listed_control[0]["endpoint_type"] == "state"
 
@@ -136,3 +162,142 @@ def test_replace_holders_is_idempotent(tmp_path: Path) -> None:
     replace_listed_rows(warehouse, "holders", rows, match_keys=("security_id", "as_of"))
     path = warehouse / "listed" / "holders" / "part.parquet"
     assert pq.read_table(path).num_rows == 2
+
+
+def test_extract_invest_from_investee_header() -> None:
+    """长期股权投资 note: 被投资单位 column, section labels ignored."""
+    invest_table = [
+        ["被投资单位", "期初余额", "期末余额"],
+        ["一、合营企业", "", ""],
+        ["耀达企业管理有限公司", "7686110.07", "6091424.06"],
+        ["二、联营企业", "", ""],
+        ["同仁堂科技发展股份有限公司", "2134500.00", "2134500.00"],
+    ]
+    named_stake = [
+        ["公司名称", "主要业务", "投资比例"],
+        ["庚联营医药有限公司", "医药流通", "30%"],
+    ]
+    pages = [
+        PageContent(
+            index=150,
+            text="17、长期股权投资\n(1).长期股权投资情况",
+            tables=[invest_table],
+        ),
+        PageContent(
+            index=28,
+            text="对外股权投资情况\n重要的联营企业",
+            tables=[named_stake],
+        ),
+    ]
+    result = extract_equity_from_pages(
+        pages,
+        security_id="SSE:600085",
+        issuer_id="91110000DEMO",
+        document_id="cninfo:demo",
+        period="2024",
+        as_of="2025-03-28",
+    )
+    names = {r["name"] for r in result.investments}
+    assert "耀达企业管理有限公司" in names
+    assert "同仁堂科技发展股份有限公司" in names
+    assert "庚联营医药有限公司" in names
+    assert "一、合营企业" not in names
+
+
+def test_edges_from_suppliers_and_invest() -> None:
+    from enterprise_scout_mcp.integrations.listed_equity_extract import (
+        edges_from_equity_extract,
+    )
+    from enterprise_scout_mcp.sources.annual_equity_pdf import EquityExtractResult
+
+    result = EquityExtractResult(
+        holders=[{"holder_name": "甲控股", "pct_total": "40"}],
+        subsidiaries=[{"name": "子A", "direct_pct": "100"}],
+        investments=[{"name": "参股B", "direct_pct": "30"}],
+        suppliers=[{"name": "供C", "purchase_pct": "15"}],
+    )
+    edges = edges_from_equity_extract(
+        result,
+        issuer_name="上市母公司",
+        credit_code="91110000DEMO",
+        collected_at="2026-01-01T00:00:00+00:00",
+    )
+    by_rel = {e["relation"]: [] for e in edges}
+    for e in edges:
+        by_rel[e["relation"]].append(e)
+    assert len(by_rel["holder"]) == 1
+    assert by_rel["holder"][0]["src_name"] == "甲控股"
+    assert by_rel["holder"][0]["dst_name"] == "上市母公司"
+    invest_dst = {e["dst_name"] for e in by_rel["invest"]}
+    assert invest_dst == {"子A", "参股B"}
+    assert len(by_rel["supply"]) == 1
+    assert by_rel["supply"][0]["dst_name"] == "供C"
+    assert by_rel["supply"][0]["src_name"] == "上市母公司"
+    assert all(e["source_channel"] == "annual_pdf" for e in edges)
+
+
+def test_replace_annual_edges_is_idempotent(tmp_path: Path) -> None:
+    from enterprise_scout_mcp.integrations.listed_equity_extract import (
+        upsert_annual_edges_to_warehouse,
+    )
+    from enterprise_scout_mcp.output.edge_schema import edge_row
+
+    warehouse = tmp_path / "warehouse"
+    edges = [
+        edge_row(
+            src_name="上市母公司",
+            dst_name="供C",
+            relation="supply",
+            ratio="15%",
+            section="suppliers",
+            platform="cninfo",
+            source_channel="annual_pdf",
+            query_keyword="上市母公司",
+            collected_at="t1",
+            payload_json="{}",
+        ),
+        edge_row(
+            src_name="上市母公司",
+            dst_name="参股B",
+            relation="invest",
+            ratio="30%",
+            section="investments",
+            platform="cninfo",
+            source_channel="annual_pdf",
+            query_keyword="上市母公司",
+            collected_at="t1",
+            payload_json="{}",
+        ),
+    ]
+    upsert_annual_edges_to_warehouse(warehouse, issuer_name="上市母公司", edges=edges)
+    upsert_annual_edges_to_warehouse(warehouse, issuer_name="上市母公司", edges=edges)
+    path = warehouse / "edges" / "equity" / "part.parquet"
+    assert pq.read_table(path).num_rows == 2
+    # Other issuer / channel must survive replace.
+    other = [
+        edge_row(
+            src_name="OtherCo",
+            dst_name="Child",
+            relation="invest",
+            ratio="10%",
+            section="invest",
+            platform="aiqicha",
+            source_channel="enscan_go",
+            query_keyword="OtherCo",
+            collected_at="t0",
+            payload_json="{}",
+        )
+    ]
+    from enterprise_scout_mcp.output.edge_writer import merge_edge_rows
+
+    merge_edge_rows(warehouse, other)
+    upsert_annual_edges_to_warehouse(
+        warehouse,
+        issuer_name="上市母公司",
+        edges=edges[:1],
+    )
+    rows = pq.read_table(path).to_pylist()
+    assert any(r["query_keyword"] == "OtherCo" for r in rows)
+    annual = [r for r in rows if r.get("source_channel") == "annual_pdf"]
+    assert len(annual) == 1
+    assert annual[0]["dst_name"] == "供C"

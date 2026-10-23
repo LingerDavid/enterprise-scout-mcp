@@ -34,6 +34,22 @@ def test_extract_edges_enscan_partner() -> None:
     assert edges[0]["ratio"] == "25.29572%"
 
 
+def test_extract_edges_supplier() -> None:
+    task = CollectTask(keyword="RootCo", platform=Platform.AIQICHA)
+    result = CollectResult(
+        task=task,
+        channel=ChannelKind.ENSCAN_GO,
+        grade=ResultGrade.OK,
+        data={"supplier": [{"供应商名称": "SuppA", "比例": "12%"}]},
+        persona_id="p1",
+    )
+    edges = extract_edges(result)
+    assert len(edges) == 1
+    assert edges[0]["relation"] == "supply"
+    assert edges[0]["src_name"] == "RootCo"
+    assert edges[0]["dst_name"] == "SuppA"
+
+
 def test_extract_edges_holds() -> None:
     task = CollectTask(keyword="RootCo", platform=Platform.AIQICHA)
     result = CollectResult(

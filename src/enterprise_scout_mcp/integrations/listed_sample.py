@@ -14,6 +14,8 @@ from typing import Any, Iterable
 import httpx
 
 from enterprise_scout_mcp.integrations.listed_equity_extract import (
+    edges_from_equity_extract,
+    upsert_annual_edges_to_warehouse,
     upsert_equity_to_warehouse,
     write_equity_corpus_record,
 )
@@ -57,6 +59,9 @@ def sample_listed_disclosure(
         "holders": 0,
         "subsidiaries": 0,
         "listed_control": 0,
+        "suppliers": 0,
+        "investments": 0,
+        "edges": 0,
         "issuer_id": "",
         "issuer_name": "",
         "period": "",
@@ -114,6 +119,9 @@ def sample_listed_disclosure(
     holders: list[dict[str, Any]] = []
     subsidiaries: list[dict[str, Any]] = []
     listed_control: list[dict[str, Any]] = []
+    suppliers: list[dict[str, Any]] = []
+    investments: list[dict[str, Any]] = []
+    annual_edges: list[dict[str, Any]] = []
     holders_feed = "eastmoney_f10"
 
     pdf_path = Path(report["pdf_path"]) if report.get("pdf_path") else None
@@ -133,6 +141,8 @@ def sample_listed_disclosure(
             "holders": len(extracted.holders),
             "subsidiaries": len(extracted.subsidiaries),
             "listed_control": len(extracted.listed_control),
+            "suppliers": len(extracted.suppliers),
+            "investments": len(extracted.investments),
             "skipped": list(extracted.skipped),
             "page_hits": dict(extracted.page_hits),
         }
@@ -142,8 +152,19 @@ def sample_listed_disclosure(
             holders_feed = "annual_pdf"
         subsidiaries = extracted.subsidiaries
         listed_control = extracted.listed_control
+        suppliers = extracted.suppliers
+        investments = extracted.investments
+        annual_edges = edges_from_equity_extract(
+            extracted,
+            issuer_name=issuer_name,
+            credit_code=credit_code,
+            collected_at=collected_at,
+        )
         report["subsidiaries"] = len(subsidiaries)
         report["listed_control"] = len(listed_control)
+        report["suppliers"] = len(suppliers)
+        report["investments"] = len(investments)
+        report["edges"] = len(annual_edges)
 
     if not holders:
         # Do not stamp cninfo document_id onto F10 rows.
@@ -201,6 +222,25 @@ def sample_listed_disclosure(
             }
             for s in subsidiaries
         ],
+        "suppliers": [
+            {
+                "rank": s.get("rank", ""),
+                "name": s.get("name", ""),
+                "purchase_pct": s.get("purchase_pct", ""),
+                "purchase_amount": s.get("purchase_amount", ""),
+                "document_id": s.get("document_id", document_id),
+            }
+            for s in suppliers
+        ],
+        "investments": [
+            {
+                "name": s.get("name", ""),
+                "direct_pct": s.get("direct_pct", ""),
+                "main_business": s.get("main_business", ""),
+                "document_id": s.get("document_id", document_id),
+            }
+            for s in investments
+        ],
         "listed_control": [
             {
                 "as_of": c.get("as_of", ""),
@@ -221,7 +261,14 @@ def sample_listed_disclosure(
         return report
 
     corpus_dir = Path(corpus_dir)
-    if period or subsidiaries or listed_control or holders_feed == "annual_pdf":
+    if (
+        period
+        or subsidiaries
+        or listed_control
+        or suppliers
+        or investments
+        or holders_feed == "annual_pdf"
+    ):
         report["corpus_path"] = str(write_equity_corpus_record(corpus_dir, record))
     else:
         corpus_dir.mkdir(parents=True, exist_ok=True)
@@ -252,6 +299,12 @@ def sample_listed_disclosure(
             subsidiaries=subsidiaries,
             listed_control=listed_control,
         )
+        if issuer_name and annual_edges:
+            upsert_annual_edges_to_warehouse(
+                Path(warehouse_dir),
+                issuer_name=issuer_name,
+                edges=annual_edges,
+            )
 
     return report
 

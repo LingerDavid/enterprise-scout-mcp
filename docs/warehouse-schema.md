@@ -65,13 +65,13 @@ Initialize corpus dirs: `escout corpus init`.
 
 ## edges/equity/part.parquet
 
-Extracted from ENScan-style nested sections: `partner` / `stockholder` / `holder` (股东→`holder`), `invest` / `holds` (投资/控股→`invest`), `branch`. ENScan 统一导出键为 `name` + `scale`（见 ENSMapLN）。
+Extracted from ENScan-style nested sections: `partner` / `stockholder` / `holder` (股东→`holder`), `invest` / `holds` (投资/控股→`invest`), `branch`, `supplier` (→`supply`). Listed annual PDFs (`source_channel=annual_pdf`) also write `holder` / `invest` / `supply` from 前十名股东、子公司/参股、前五名供应商. ENScan 统一导出键为 `name` + `scale`（见 ENSMapLN）。
 
 | Column | Type | Description |
 |--------|------|-------------|
 | `src_name` | string | Source entity (holder or parent) |
-| `dst_name` | string | Target entity (investee / branch) |
-| `relation` | string | `invest`, `holder`, `branch` |
+| `dst_name` | string | Target entity (investee / branch / supplier) |
+| `relation` | string | `invest`, `holder`, `branch`, `supply` |
 | `ratio` | string | Stake ratio when present |
 | `section` | string | Source section key in payload |
 | `platform` | string | Task platform |
