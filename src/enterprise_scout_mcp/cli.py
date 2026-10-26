@@ -501,6 +501,31 @@ def cmd_corpus_backfill_f10(args: argparse.Namespace) -> int:
     return 0 if written > 0 or summary.get("error") is None else 1
 
 
+def cmd_corpus_backfill_facts_em(args: argparse.Namespace) -> int:
+    from enterprise_scout_mcp.config import resolve_project_root
+    from enterprise_scout_mcp.integrations.listed_facts_em_backfill import backfill_listed_facts_em
+
+    config = load_config(args.config)
+    root = resolve_project_root()
+
+    def _dir(rel: str) -> Path:
+        p = Path(rel)
+        return p if p.is_absolute() else root / p
+
+    warehouse_dir = _dir(config.output.warehouse_dir)
+    limit = int(args.limit) if int(args.limit) > 0 else None
+    progress = Path(args.progress) if args.progress else None
+    summary = backfill_listed_facts_em(
+        warehouse_dir,
+        workers=int(args.workers),
+        limit=limit,
+        page_size=int(args.page_size),
+        progress_path=progress,
+    )
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0 if summary.get("facts_written", 0) > 0 else 1
+
+
 def cmd_corpus_sync_facts(args: argparse.Namespace) -> int:
     from enterprise_scout_mcp.config import resolve_project_root
     from enterprise_scout_mcp.integrations.listed_facts_bridge import sync_panel_to_listed_facts
@@ -1103,6 +1128,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     corpus_facts.add_argument("--dry-run", action="store_true", help="Count rows only")
     corpus_facts.set_defaults(func=cmd_corpus_sync_facts, corpus_cmd="sync-facts")
+    corpus_facts_em = corpus_sub.add_parser(
+        "backfill-facts-em",
+        help="Backfill listed/facts from East Money datacenter (no QMT)",
+    )
+    corpus_facts_em.add_argument("--workers", type=int, default=12)
+    corpus_facts_em.add_argument("--limit", type=int, default=0, help="Max symbols (0=all)")
+    corpus_facts_em.add_argument("--page-size", type=int, default=12, help="Periods per statement")
+    corpus_facts_em.add_argument("--progress", default="", help="Append summary JSONL path")
+    corpus_facts_em.set_defaults(func=cmd_corpus_backfill_facts_em, corpus_cmd="backfill-facts-em")
 
     listed = sub.add_parser("listed", help="Listed-company dossier (East Money F10 shape)")
     listed_sub = listed.add_subparsers(dest="listed_cmd", required=True)

@@ -317,6 +317,20 @@ def create_mcp_server():
         return json.dumps(summary, ensure_ascii=False)
 
     @mcp.tool()
+    def listed_backfill_facts_em(workers: int = 12, limit: int = 0, page_size: int = 12) -> str:
+        """Backfill listed/facts from East Money datacenter (transition until QMT panel exists)."""
+        from enterprise_scout_mcp.integrations.listed_facts_em_backfill import backfill_listed_facts_em
+
+        config = load_config()
+        summary = backfill_listed_facts_em(
+            Path(config.output.warehouse_dir),
+            workers=workers,
+            limit=limit if limit > 0 else None,
+            page_size=page_size,
+        )
+        return json.dumps(summary, ensure_ascii=False)
+
+    @mcp.tool()
     def listed_sync_facts(panel_dir: str = "", dry_run: bool = False) -> str:
         """Sync tradecraft panel financials parquet into listed/facts."""
         from enterprise_scout_mcp.config import resolve_project_root
