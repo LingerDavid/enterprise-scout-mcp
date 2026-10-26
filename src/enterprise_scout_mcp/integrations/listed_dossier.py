@@ -94,6 +94,7 @@ def build_listed_dossier(
                     reverse=True,
                 ),
                 "control": _filter_issuer(_read_table(warehouse_dir, "listed_control"), issuer_id),
+                "float_share_mix": _filter_security(_read_table(warehouse_dir, "float_share_mix"), security_id),
             },
             "经营分析": {
                 "segments": _filter_issuer(_read_table(warehouse_dir, "segments"), issuer_id),
@@ -115,9 +116,24 @@ def build_listed_dossier(
             },
             "分红融资": {
                 "dividends": _filter_security(_read_table(warehouse_dir, "dividends"), security_id),
+                "dividend_summary": sorted(
+                    _filter_security(_read_table(warehouse_dir, "dividend_summary"), security_id),
+                    key=lambda r: str(r.get("year") or ""),
+                    reverse=True,
+                ),
+                "seo_issues": sorted(
+                    _filter_security(_read_table(warehouse_dir, "seo_issues"), security_id),
+                    key=lambda r: str(r.get("notice_date") or ""),
+                    reverse=True,
+                ),
             },
             "股本结构": {
                 "capital": _filter_security(_read_table(warehouse_dir, "capital"), security_id),
+                "capital_history": sorted(
+                    _filter_security(_read_table(warehouse_dir, "capital_history"), security_id),
+                    key=lambda r: str(r.get("as_of") or ""),
+                    reverse=True,
+                ),
             },
             "公司高管": {
                 "executives": _filter_security(_read_table(warehouse_dir, "executives"), security_id),

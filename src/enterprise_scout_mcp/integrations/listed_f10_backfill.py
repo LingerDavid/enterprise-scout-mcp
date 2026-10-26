@@ -13,9 +13,12 @@ from enterprise_scout_mcp.integrations.listed_batch_utils import (
     run_identity_batch,
 )
 from enterprise_scout_mcp.output.listed_schema import to_tradecraft_symbol
+from enterprise_scout_mcp.sources.eastmoney_bonus_extras import fetch_bonus_extras
 from enterprise_scout_mcp.sources.eastmoney_capital import fetch_capital_structure
+from enterprise_scout_mcp.sources.eastmoney_capital_history import fetch_capital_history
 from enterprise_scout_mcp.sources.eastmoney_control import fetch_actual_controller
 from enterprise_scout_mcp.sources.eastmoney_dividends import fetch_dividends
+from enterprise_scout_mcp.sources.eastmoney_float_share_mix import fetch_float_share_mix
 from enterprise_scout_mcp.sources.eastmoney_exec_trades import fetch_exec_holding_changes
 from enterprise_scout_mcp.sources.eastmoney_fund_holdings import fetch_fund_holdings
 from enterprise_scout_mcp.sources.eastmoney_executives import fetch_executives
@@ -34,11 +37,15 @@ _DEFAULT_TABLES = (
     "holder_stats",
     "institutional_holdings",
     "fund_holdings",
+    "float_share_mix",
     "ipo_profile",
     "capital",
+    "capital_history",
     "executives",
     "exec_holding_changes",
     "dividends",
+    "dividend_summary",
+    "seo_issues",
     "control",
     "workforce",
 )
@@ -61,6 +68,9 @@ def _fetch_table(table: str, sym: str, identity_row: dict[str, Any], collected_a
     if table == "fund_holdings":
         rep = fetch_fund_holdings(sym, collected_at=collected_at)
         return {"rows": rep.get("fund_holdings") or [], "skipped": rep.get("skipped") or []}
+    if table == "float_share_mix":
+        rep = fetch_float_share_mix(sym, collected_at=collected_at)
+        return {"rows": rep.get("float_share_mix") or [], "skipped": rep.get("skipped") or []}
     if table == "holder_stats":
         rep = fetch_holder_stats(sym, collected_at=collected_at)
         return {"rows": rep.get("holder_stats") or [], "skipped": rep.get("skipped") or []}
@@ -70,6 +80,9 @@ def _fetch_table(table: str, sym: str, identity_row: dict[str, Any], collected_a
     if table == "capital":
         rep = fetch_capital_structure(sym, collected_at=collected_at)
         return {"rows": rep.get("capital") or [], "skipped": rep.get("skipped") or []}
+    if table == "capital_history":
+        rep = fetch_capital_history(sym, collected_at=collected_at)
+        return {"rows": rep.get("capital_history") or [], "skipped": rep.get("skipped") or []}
     if table == "executives":
         rep = fetch_executives(sym, collected_at=collected_at)
         return {"rows": rep.get("executives") or [], "skipped": rep.get("skipped") or []}
@@ -79,6 +92,12 @@ def _fetch_table(table: str, sym: str, identity_row: dict[str, Any], collected_a
     if table == "dividends":
         rep = fetch_dividends(sym, collected_at=collected_at)
         return {"rows": rep.get("dividends") or [], "skipped": rep.get("skipped") or []}
+    if table == "dividend_summary":
+        rep = fetch_bonus_extras(sym, collected_at=collected_at)
+        return {"rows": rep.get("dividend_summary") or [], "skipped": rep.get("skipped") or []}
+    if table == "seo_issues":
+        rep = fetch_bonus_extras(sym, collected_at=collected_at)
+        return {"rows": rep.get("seo_issues") or [], "skipped": rep.get("skipped") or []}
     if table == "control":
         rep = fetch_actual_controller(sym, issuer_id=issuer_id, collected_at=collected_at)
         return {"rows": rep.get("control") or [], "skipped": rep.get("skipped") or []}

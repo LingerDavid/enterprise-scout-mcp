@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+from enterprise_scout_mcp.sources.eastmoney_bonus_extras import (
+    dividend_summary_from_f10_payload,
+    seo_issues_from_f10_payload,
+)
+from enterprise_scout_mcp.sources.eastmoney_capital_history import capital_history_from_f10_payload
 from enterprise_scout_mcp.sources.eastmoney_exec_trades import exec_trades_from_f10_payload
+from enterprise_scout_mcp.sources.eastmoney_float_share_mix import float_share_mix_from_f10_payload
 from enterprise_scout_mcp.sources.eastmoney_fund_holdings import fund_holdings_from_f10_payload
 from enterprise_scout_mcp.sources.eastmoney_f10_probe import summarize_page_ajax_payload
 from enterprise_scout_mcp.sources.eastmoney_float_holders import float_holders_from_f10_payload
@@ -85,6 +91,73 @@ def test_institutional_from_jgcc() -> None:
     )
     assert rows[0]["org_type"] == "基金"
     assert rows[0]["org_count"] == "120"
+
+
+def test_float_share_mix_from_ltgf() -> None:
+    rows = float_share_mix_from_f10_payload(
+        {
+            "ltgf": [
+                {
+                    "END_DATE": "2025-12-31",
+                    "LIMITED_SHARES": 100,
+                    "OTHER_UNLIMITED_SHARES": 900,
+                    "HOLD_NUM_COUNT": 900,
+                    "LIMITED_SHARES_RATIO": 10.0,
+                    "UNLIMITED_SHARES_RATIO": 90.0,
+                }
+            ]
+        },
+        security_id="SZSE:002271",
+        collected_at="t0",
+    )
+    assert rows[0]["limited_shares"] == "100"
+    assert rows[0]["unlimited_pct"] == "90.0"
+
+
+def test_dividend_summary_and_seo_issues() -> None:
+    summary = dividend_summary_from_f10_payload(
+        {"lnfhrz": [{"STATISTICS_YEAR": "2025", "TOTAL_DIVIDEND": 1000000, "SEO_NUM": 1}]},
+        security_id="SZSE:002271",
+        collected_at="t0",
+    )
+    seo = seo_issues_from_f10_payload(
+        {
+            "zfmx": [
+                {
+                    "NOTICE_DATE": "2021-04-02",
+                    "ISSUE_NUM": 1000,
+                    "ISSUE_PRICE": 45.5,
+                    "NET_RAISE_FUNDS": 50000000,
+                    "ISSUE_WAY_EXPLAIN": "非公开发行",
+                }
+            ]
+        },
+        security_id="SZSE:002271",
+        collected_at="t0",
+    )
+    assert summary[0]["year"] == "2025"
+    assert seo[0]["issue_price"] == "45.5"
+
+
+def test_capital_history_merge() -> None:
+    rows = capital_history_from_f10_payload(
+        {
+            "gbgc": [{"END_DATE": "2025-12-31", "TOTAL_SHARES": 1000, "LISTED_A_SHARES": 800, "LIMITED_SHARES": 200}],
+            "lngbbd": [
+                {
+                    "END_DATE": "2025-12-31",
+                    "UNLIMITED_SHARES": 800,
+                    "LOCK_SHARES": 150,
+                    "CHANGE_REASON": "增发",
+                }
+            ],
+        },
+        security_id="SZSE:002271",
+        collected_at="t0",
+    )
+    assert len(rows) == 1
+    assert rows[0]["lock_shares"] == "150"
+    assert rows[0]["change_reason"] == "增发"
 
 
 def test_fund_holdings_from_jjcq() -> None:

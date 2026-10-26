@@ -28,6 +28,8 @@ def capital_from_f10_payload(
     as_of = date_str(row.get("END_DATE")) or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     total = row.get("TOTAL_SHARES")
     float_sh = row.get("UNLIMITED_SHARES") or row.get("LISTED_A_SHARES")
+    limited = row.get("LIMITED_SHARES")
+    listed_a = row.get("LISTED_A_SHARES")
     if total is None and float_sh is None:
         return []
     return [
@@ -36,6 +38,8 @@ def capital_from_f10_payload(
             as_of=as_of,
             total_shares="" if total is None else str(int(float(total))),
             float_shares="" if float_sh is None else str(int(float(float_sh))),
+            limited_shares="" if limited is None else str(int(float(limited))),
+            listed_a_shares="" if listed_a is None else str(int(float(listed_a))),
             document_id=document_id or f"eastmoney:f10:gbjg:{security_id}:{as_of}",
             collected_at=collected_at,
         )

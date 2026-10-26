@@ -15,9 +15,13 @@ from enterprise_scout_mcp.output.listed_schema import (
     LISTED_CONTROL_COLUMNS,
     SEGMENTS_COLUMNS,
     SUBSIDIARIES_COLUMNS,
+    CAPITAL_HISTORY_COLUMNS,
+    DIVIDEND_SUMMARY_COLUMNS,
     EXEC_HOLDING_CHANGES_COLUMNS,
     FLOAT_HOLDERS_COLUMNS,
+    FLOAT_SHARE_MIX_COLUMNS,
     FUND_HOLDINGS_COLUMNS,
+    SEO_ISSUE_COLUMNS,
     HOLDER_STATS_COLUMNS,
     INSTITUTIONAL_HOLDINGS_COLUMNS,
     IPO_PROFILE_COLUMNS,
@@ -42,6 +46,10 @@ _TABLE_COLUMNS: dict[str, tuple[str, ...]] = {
     "institutional_holdings": INSTITUTIONAL_HOLDINGS_COLUMNS,
     "exec_holding_changes": EXEC_HOLDING_CHANGES_COLUMNS,
     "fund_holdings": FUND_HOLDINGS_COLUMNS,
+    "float_share_mix": FLOAT_SHARE_MIX_COLUMNS,
+    "dividend_summary": DIVIDEND_SUMMARY_COLUMNS,
+    "seo_issues": SEO_ISSUE_COLUMNS,
+    "capital_history": CAPITAL_HISTORY_COLUMNS,
 }
 
 

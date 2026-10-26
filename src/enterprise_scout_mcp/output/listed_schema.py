@@ -60,6 +60,8 @@ CAPITAL_COLUMNS = (
     "as_of",
     "total_shares",
     "float_shares",
+    "limited_shares",
+    "listed_a_shares",
     "document_id",
     "collected_at",
 )
@@ -220,6 +222,57 @@ EXEC_HOLDING_CHANGES_COLUMNS = (
     "shares_after",
     "trade_way",
     "holder_name",
+    "document_id",
+    "collected_at",
+)
+
+FLOAT_SHARE_MIX_COLUMNS = (
+    "security_id",
+    "as_of",
+    "limited_shares",
+    "unlimited_shares",
+    "other_unlimited_shares",
+    "hold_num_count",
+    "limited_pct",
+    "unlimited_pct",
+    "document_id",
+    "collected_at",
+)
+
+DIVIDEND_SUMMARY_COLUMNS = (
+    "security_id",
+    "year",
+    "total_dividend",
+    "seo_count",
+    "allotment_count",
+    "ipo_count",
+    "document_id",
+    "collected_at",
+)
+
+SEO_ISSUE_COLUMNS = (
+    "security_id",
+    "notice_date",
+    "listing_date",
+    "issue_num",
+    "issue_price",
+    "net_raise_funds",
+    "issue_way",
+    "reg_date",
+    "receive_date",
+    "document_id",
+    "collected_at",
+)
+
+CAPITAL_HISTORY_COLUMNS = (
+    "security_id",
+    "as_of",
+    "total_shares",
+    "listed_a_shares",
+    "limited_shares",
+    "unlimited_shares",
+    "lock_shares",
+    "change_reason",
     "document_id",
     "collected_at",
 )
@@ -405,3 +458,19 @@ def exec_holding_change_row(**fields: Any) -> dict[str, Any]:
 
 def fund_holding_row(**fields: Any) -> dict[str, Any]:
     return _row(FUND_HOLDINGS_COLUMNS, **fields)
+
+
+def float_share_mix_row(**fields: Any) -> dict[str, Any]:
+    return _row(FLOAT_SHARE_MIX_COLUMNS, **fields)
+
+
+def dividend_summary_row(**fields: Any) -> dict[str, Any]:
+    return _row(DIVIDEND_SUMMARY_COLUMNS, **fields)
+
+
+def seo_issue_row(**fields: Any) -> dict[str, Any]:
+    return _row(SEO_ISSUE_COLUMNS, **fields)
+
+
+def capital_history_row(**fields: Any) -> dict[str, Any]:
+    return _row(CAPITAL_HISTORY_COLUMNS, **fields)

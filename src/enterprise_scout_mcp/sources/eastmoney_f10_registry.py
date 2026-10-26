@@ -40,8 +40,8 @@ F10_TABS: tuple[F10TabSpec, ...] = (
             "gdrs": "holder_stats",
             "jgcc": "institutional_holdings",
             "jjcg": "fund_holdings",
+            "ltgf": "float_share_mix",
         },
-        notes="ltgf (流通股本结构) unmapped",
     ),
     F10TabSpec(
         tab="经营分析",
@@ -69,14 +69,23 @@ F10_TABS: tuple[F10TabSpec, ...] = (
     F10TabSpec(
         tab="分红融资",
         page_module="BonusFinancing",
-        mapped_page_keys={"fhyx": "dividends"},
-        notes="lnfhrz/pgmx/zfmx unmapped",
+        mapped_page_keys={
+            "fhyx": "dividends",
+            "lnfhrz": "dividend_summary",
+            "zfmx": "seo_issues",
+            "pgmx": "allotment_issues",
+        },
+        notes="pgmx (配股) often empty per symbol",
     ),
     F10TabSpec(
         tab="股本结构",
         page_module="CapitalStockStructure",
-        mapped_page_keys={"gbjg": "capital"},
-        notes="gbgc/lngbbd/xsjj unmapped",
+        mapped_page_keys={
+            "gbjg": "capital",
+            "gbgc": "capital_history",
+            "lngbbd": "capital_history",
+        },
+        notes="xsjj (限售解禁) often empty per symbol",
     ),
     F10TabSpec(
         tab="公司高管",
