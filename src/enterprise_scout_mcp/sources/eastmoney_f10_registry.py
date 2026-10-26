@@ -46,8 +46,20 @@ F10_TABS: tuple[F10TabSpec, ...] = (
     F10TabSpec(
         tab="经营分析",
         page_module="BusinessAnalysis",
-        mapped_page_keys={"zygcfx": "segments"},
-        notes="zyfw/jyps are narrative blocks, not tabular",
+        mapped_page_keys={
+            "zyfw": "business_scope",
+            "zygcfx": "segments",
+            "jyps": "business_review",
+        },
+    ),
+    F10TabSpec(
+        tab="核心题材",
+        page_module="CoreConception",
+        mapped_page_keys={
+            "hxtc": "core_highlights",
+            "ssbk": "concept_boards",
+        },
+        notes="hxtc=亮点/要点条目; ssbk=所属概念板块",
     ),
     F10TabSpec(
         tab="员工及业务竞争力",

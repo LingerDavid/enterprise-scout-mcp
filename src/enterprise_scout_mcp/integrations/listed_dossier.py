@@ -97,7 +97,25 @@ def build_listed_dossier(
                 "float_share_mix": _filter_security(_read_table(warehouse_dir, "float_share_mix"), security_id),
             },
             "经营分析": {
+                "business_scope": _filter_security(
+                    _read_table(warehouse_dir, "business_scope"),
+                    security_id,
+                ),
                 "segments": _filter_issuer(_read_table(warehouse_dir, "segments"), issuer_id),
+                "business_review": _filter_security(
+                    _read_table(warehouse_dir, "business_review"),
+                    security_id,
+                ),
+            },
+            "核心题材": {
+                "highlights": _filter_security(
+                    _read_table(warehouse_dir, "core_highlights"),
+                    security_id,
+                ),
+                "concept_boards": sorted(
+                    _filter_security(_read_table(warehouse_dir, "concept_boards"), security_id),
+                    key=lambda r: int(str(r.get("board_rank") or "0") or 0),
+                ),
             },
             "员工及业务竞争力": {
                 "workforce": sorted(

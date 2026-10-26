@@ -28,11 +28,17 @@ from enterprise_scout_mcp.sources.eastmoney_holder_stats import fetch_holder_sta
 from enterprise_scout_mcp.sources.eastmoney_holders import fetch_top_holders
 from enterprise_scout_mcp.sources.eastmoney_institutional import fetch_institutional_holdings
 from enterprise_scout_mcp.sources.eastmoney_ipo_profile import fetch_ipo_profile
+from enterprise_scout_mcp.sources.eastmoney_business_narratives import fetch_business_narratives
+from enterprise_scout_mcp.sources.eastmoney_core_conception import fetch_core_conception
 from enterprise_scout_mcp.sources.eastmoney_segments import fetch_business_segments
 from enterprise_scout_mcp.sources.eastmoney_workforce import fetch_workforce_metrics
 
 DEFAULT_LISTED_F10_TABLES = (
     "segments",
+    "business_scope",
+    "business_review",
+    "core_highlights",
+    "concept_boards",
     "holders",
     "float_holders",
     "holder_stats",
@@ -59,6 +65,18 @@ def _fetch_table(table: str, sym: str, identity_row: dict[str, Any], collected_a
     if table == "segments":
         rep = fetch_business_segments(sym, issuer_id=issuer_id)
         return {"rows": rep.get("segments") or [], "skipped": rep.get("skipped") or []}
+    if table == "business_scope":
+        rep = fetch_business_narratives(sym, collected_at=collected_at)
+        return {"rows": rep.get("business_scope") or [], "skipped": rep.get("skipped") or []}
+    if table == "business_review":
+        rep = fetch_business_narratives(sym, collected_at=collected_at)
+        return {"rows": rep.get("business_review") or [], "skipped": rep.get("skipped") or []}
+    if table == "core_highlights":
+        rep = fetch_core_conception(sym, collected_at=collected_at)
+        return {"rows": rep.get("core_highlights") or [], "skipped": rep.get("skipped") or []}
+    if table == "concept_boards":
+        rep = fetch_core_conception(sym, collected_at=collected_at)
+        return {"rows": rep.get("concept_boards") or [], "skipped": rep.get("skipped") or []}
     if table == "holders":
         rows = fetch_top_holders(sym, collected_at=collected_at)
         return {"rows": rows, "skipped": [] if rows else ["empty_sdgd"]}
@@ -141,6 +159,18 @@ def backfill_listed_f10(
         identity = filtered
     if limit is not None:
         identity = identity[: max(0, int(limit))]
+
+    # identity may contain duplicate security_id rows from repeated sample-listed runs.
+    seen_security: set[str] = set()
+    deduped: list[dict[str, Any]] = []
+    for row in identity:
+        sid = str(row.get("security_id") or "").strip()
+        if sid and sid in seen_security:
+            continue
+        if sid:
+            seen_security.add(sid)
+        deduped.append(row)
+    identity = deduped
 
     summary: dict[str, Any] = {
         "warehouse_dir": str(warehouse_dir),

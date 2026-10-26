@@ -55,6 +55,47 @@ SEGMENTS_COLUMNS = (
     "collected_at",
 )
 
+# BusinessAnalysis.zyfw — 主营范围 (narrative, one row per listing).
+BUSINESS_SCOPE_COLUMNS = (
+    "security_id",
+    "business_scope",
+    "document_id",
+    "collected_at",
+)
+
+# BusinessAnalysis.jyps — 经营评述 (latest report snapshot).
+BUSINESS_REVIEW_COLUMNS = (
+    "security_id",
+    "as_of",
+    "content",
+    "document_id",
+    "collected_at",
+)
+
+# CoreConception.hxtc — 核心题材 / 亮点条目.
+CORE_HIGHLIGHT_COLUMNS = (
+    "security_id",
+    "keyword",
+    "key_classif",
+    "key_classif_code",
+    "mainpoint_rank",
+    "content",
+    "is_highlight",
+    "document_id",
+    "collected_at",
+)
+
+# CoreConception.ssbk — 概念板块归属.
+CONCEPT_BOARD_COLUMNS = (
+    "security_id",
+    "board_code",
+    "board_name",
+    "board_rank",
+    "is_precise",
+    "document_id",
+    "collected_at",
+)
+
 CAPITAL_COLUMNS = (
     "security_id",
     "as_of",
@@ -426,6 +467,22 @@ def facts_row(**fields: Any) -> dict[str, Any]:
 
 def segments_row(**fields: Any) -> dict[str, Any]:
     return _row(SEGMENTS_COLUMNS, **fields)
+
+
+def business_scope_row(**fields: Any) -> dict[str, Any]:
+    return _row(BUSINESS_SCOPE_COLUMNS, **fields)
+
+
+def business_review_row(**fields: Any) -> dict[str, Any]:
+    return _row(BUSINESS_REVIEW_COLUMNS, **fields)
+
+
+def core_highlight_row(**fields: Any) -> dict[str, Any]:
+    return _row(CORE_HIGHLIGHT_COLUMNS, **fields)
+
+
+def concept_board_row(**fields: Any) -> dict[str, Any]:
+    return _row(CONCEPT_BOARD_COLUMNS, **fields)
 
 
 def capital_row(**fields: Any) -> dict[str, Any]:
