@@ -467,6 +467,84 @@ def cmd_corpus_backfill_segments(args: argparse.Namespace) -> int:
     return 0 if summary.get("segments_written", 0) > 0 else 1
 
 
+def cmd_corpus_backfill_f10(args: argparse.Namespace) -> int:
+    from enterprise_scout_mcp.config import resolve_project_root
+    from enterprise_scout_mcp.integrations.listed_f10_backfill import backfill_listed_f10
+
+    config = load_config(args.config)
+    root = resolve_project_root()
+
+    def _dir(rel: str) -> Path:
+        p = Path(rel)
+        return p if p.is_absolute() else root / p
+
+    warehouse_dir = _dir(config.output.warehouse_dir)
+    limit = int(args.limit) if int(args.limit) > 0 else None
+    progress = Path(args.progress) if args.progress else None
+    tables = tuple(t.strip() for t in str(args.tables or "").split(",") if t.strip()) or None
+    summary = backfill_listed_f10(
+        warehouse_dir,
+        tables=tables or (
+            "segments",
+            "holders",
+            "capital",
+            "executives",
+            "dividends",
+            "control",
+        ),
+        workers=int(args.workers),
+        limit=limit,
+        progress_path=progress,
+    )
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    written = sum(int((v or {}).get("rows_written") or 0) for v in (summary.get("results") or {}).values())
+    return 0 if written > 0 or summary.get("error") is None else 1
+
+
+def cmd_corpus_sync_facts(args: argparse.Namespace) -> int:
+    from enterprise_scout_mcp.config import resolve_project_root
+    from enterprise_scout_mcp.integrations.listed_facts_bridge import sync_panel_to_listed_facts
+
+    config = load_config(args.config)
+    root = resolve_project_root()
+
+    def _dir(rel: str) -> Path:
+        p = Path(rel)
+        return p if p.is_absolute() else root / p
+
+    warehouse_dir = _dir(config.output.warehouse_dir)
+    panel_dir = Path(args.panel_dir) if args.panel_dir else root.parent / "tradecraft" / "data"
+    if not panel_dir.is_absolute():
+        panel_dir = root / panel_dir
+    report = sync_panel_to_listed_facts(
+        panel_dir,
+        warehouse_dir,
+        dry_run=bool(args.dry_run),
+    )
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return 0 if report.get("ok") else 1
+
+
+def cmd_listed_dossier(args: argparse.Namespace) -> int:
+    from enterprise_scout_mcp.config import resolve_project_root
+    from enterprise_scout_mcp.integrations.listed_dossier import build_listed_dossier
+
+    config = load_config(args.config)
+    root = resolve_project_root()
+
+    def _dir(rel: str) -> Path:
+        p = Path(rel)
+        return p if p.is_absolute() else root / p
+
+    dossier = build_listed_dossier(
+        _dir(config.output.warehouse_dir),
+        args.symbol,
+        include_peers=not args.no_peers,
+    )
+    print(json.dumps(dossier, ensure_ascii=False, indent=2))
+    return 0 if dossier.get("ok") else 1
+
+
 def cmd_corpus_import_listed(args: argparse.Namespace) -> int:
     from enterprise_scout_mcp.config import resolve_project_root
     from enterprise_scout_mcp.integrations.listed_corpus import import_listed_corpus
@@ -1001,6 +1079,37 @@ def build_parser() -> argparse.ArgumentParser:
     corpus_segments.add_argument("--limit", type=int, default=0, help="Max symbols (0=all)")
     corpus_segments.add_argument("--progress", default="", help="Append summary JSONL path")
     corpus_segments.set_defaults(func=cmd_corpus_backfill_segments, corpus_cmd="backfill-segments")
+    corpus_f10 = corpus_sub.add_parser(
+        "backfill-f10",
+        help="Backfill F10 tabs: segments/holders/capital/executives/dividends/control",
+    )
+    corpus_f10.add_argument("--workers", type=int, default=12, help="Parallel fetch workers")
+    corpus_f10.add_argument("--limit", type=int, default=0, help="Max symbols (0=all)")
+    corpus_f10.add_argument("--progress", default="", help="Append summary JSONL path")
+    corpus_f10.add_argument(
+        "--tables",
+        default="",
+        help="Comma list: segments,holders,capital,executives,dividends,control (default all)",
+    )
+    corpus_f10.set_defaults(func=cmd_corpus_backfill_f10, corpus_cmd="backfill-f10")
+    corpus_facts = corpus_sub.add_parser(
+        "sync-facts",
+        help="Sync tradecraft panel financials → warehouse/listed/facts",
+    )
+    corpus_facts.add_argument(
+        "--panel-dir",
+        default="",
+        help="Tradecraft data dir (default ../tradecraft/data)",
+    )
+    corpus_facts.add_argument("--dry-run", action="store_true", help="Count rows only")
+    corpus_facts.set_defaults(func=cmd_corpus_sync_facts, corpus_cmd="sync-facts")
+
+    listed = sub.add_parser("listed", help="Listed-company dossier (East Money F10 shape)")
+    listed_sub = listed.add_subparsers(dest="listed_cmd", required=True)
+    listed_dossier = listed_sub.add_parser("dossier", help="Assemble F10-style dossier from warehouse")
+    listed_dossier.add_argument("symbol", help="600519.SH or SSE:600519")
+    listed_dossier.add_argument("--no-peers", action="store_true", help="Skip peer comparison tab")
+    listed_dossier.set_defaults(func=cmd_listed_dossier, listed_cmd="dossier")
 
     drain = sub.add_parser("drain-retry", help="Re-run jobs from raw/retry_queue")
     drain.add_argument("--limit", type=int, default=0, help="Max jobs (0 = all)")

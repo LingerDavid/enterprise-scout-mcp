@@ -268,6 +268,68 @@ def create_mcp_server():
         finally:
             scheduler.close()
 
+    @mcp.tool()
+    def listed_dossier(symbol: str, include_peers: bool = True) -> str:
+        """East-Money-style F10 dossier from EnterpriseLake listed/* tables."""
+        from enterprise_scout_mcp.integrations.listed_dossier import build_listed_dossier
+
+        config = load_config()
+        dossier = build_listed_dossier(
+            Path(config.output.warehouse_dir),
+            symbol,
+            include_peers=include_peers,
+        )
+        return json.dumps(dossier, ensure_ascii=False)
+
+    @mcp.tool()
+    def listed_peer_compare(symbol: str, period: str = "") -> str:
+        """In-warehouse peer percentiles (CSRC industry, n≥8)."""
+        from enterprise_scout_mcp.integrations.listed_peers import peer_compare
+
+        config = load_config()
+        report = peer_compare(Path(config.output.warehouse_dir), symbol, period=period)
+        return json.dumps(report, ensure_ascii=False)
+
+    @mcp.tool()
+    def listed_backfill_f10(
+        tables: str = "",
+        workers: int = 12,
+        limit: int = 0,
+    ) -> str:
+        """Batch backfill East Money F10 → listed warehouse (segments/holders/capital/…)."""
+        from enterprise_scout_mcp.integrations.listed_f10_backfill import backfill_listed_f10
+
+        config = load_config()
+        picked = tuple(t.strip() for t in tables.split(",") if t.strip()) or (
+            "segments",
+            "holders",
+            "capital",
+            "executives",
+            "dividends",
+            "control",
+        )
+        summary = backfill_listed_f10(
+            Path(config.output.warehouse_dir),
+            tables=picked,
+            workers=workers,
+            limit=limit if limit > 0 else None,
+        )
+        return json.dumps(summary, ensure_ascii=False)
+
+    @mcp.tool()
+    def listed_sync_facts(panel_dir: str = "", dry_run: bool = False) -> str:
+        """Sync tradecraft panel financials parquet into listed/facts."""
+        from enterprise_scout_mcp.config import resolve_project_root
+        from enterprise_scout_mcp.integrations.listed_facts_bridge import sync_panel_to_listed_facts
+
+        config = load_config()
+        root = resolve_project_root()
+        data = Path(panel_dir) if panel_dir else root.parent / "tradecraft" / "data"
+        if not data.is_absolute():
+            data = root / data
+        report = sync_panel_to_listed_facts(data, Path(config.output.warehouse_dir), dry_run=dry_run)
+        return json.dumps(report, ensure_ascii=False)
+
     return mcp
 
 

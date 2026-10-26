@@ -105,6 +105,34 @@ LISTED_CONTROL_COLUMNS = (
     "collected_at",
 )
 
+EXECUTIVES_COLUMNS = (
+    "security_id",
+    "person_name",
+    "position",
+    "position_type",
+    "sex",
+    "age",
+    "education",
+    "salary",
+    "shares",
+    "resume",
+    "incumbent_since",
+    "document_id",
+    "collected_at",
+)
+
+DIVIDENDS_COLUMNS = (
+    "security_id",
+    "notice_date",
+    "ex_dividend_date",
+    "pay_cash_date",
+    "record_date",
+    "assign_progress",
+    "impl_plan",
+    "document_id",
+    "collected_at",
+)
+
 # Profit waterfall order (display). gross_profit may be derived at read time.
 INCOME_ITEM_CODES = (
     "revenue",
@@ -231,3 +259,11 @@ def subsidiaries_row(**fields: Any) -> dict[str, Any]:
 
 def listed_control_row(**fields: Any) -> dict[str, Any]:
     return _row(LISTED_CONTROL_COLUMNS, **fields)
+
+
+def executives_row(**fields: Any) -> dict[str, Any]:
+    return _row(EXECUTIVES_COLUMNS, **fields)
+
+
+def dividends_row(**fields: Any) -> dict[str, Any]:
+    return _row(DIVIDENDS_COLUMNS, **fields)

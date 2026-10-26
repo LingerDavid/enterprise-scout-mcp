@@ -9,21 +9,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from enterprise_scout_mcp.integrations.listed_batch_utils import merge_listed_table, read_identity_rows
 from enterprise_scout_mcp.output.listed_schema import to_tradecraft_symbol
-from enterprise_scout_mcp.output.listed_writer import listed_part_path
 from enterprise_scout_mcp.sources.eastmoney_segments import fetch_business_segments
-
-
-def _read_identity_rows(warehouse_dir: Path) -> list[dict[str, Any]]:
-    part = listed_part_path(warehouse_dir, "identity")
-    if not part.is_file():
-        return []
-    try:
-        import pyarrow.parquet as pq
-
-        return pq.read_table(part).to_pylist()
-    except Exception:
-        return []
 
 
 def _fetch_one(row: dict[str, Any]) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
@@ -46,7 +34,7 @@ def backfill_listed_segments(
 ) -> dict[str, Any]:
     """Fetch F10 segments for each identity row; write listed/segments parquet."""
     warehouse_dir = Path(warehouse_dir)
-    identity = _read_identity_rows(warehouse_dir)
+    identity = read_identity_rows(warehouse_dir)
     if limit is not None:
         identity = identity[: max(0, int(limit))]
 
@@ -97,17 +85,18 @@ def backfill_listed_segments(
     summary["finished_at"] = datetime.now(timezone.utc).isoformat()
 
     if segment_rows:
-        # Fresh write (segments table was missing).
-        try:
-            import pyarrow as pa
-            import pyarrow.parquet as pq
-        except ImportError:
+        touched_issuer = {str(r.get("issuer_id") or "") for r in identity if r.get("issuer_id")}
+        part = merge_listed_table(
+            warehouse_dir,
+            "segments",
+            segment_rows,
+            drop_key="issuer_id",
+            drop_values=touched_issuer,
+        )
+        if part is None:
             summary["error"] = "pyarrow_missing"
             return summary
-        part = listed_part_path(warehouse_dir, "segments")
-        part.parent.mkdir(parents=True, exist_ok=True)
-        pq.write_table(pa.Table.from_pylist(segment_rows), part)
-        summary["segments_path"] = str(part)
+        summary["segments_path"] = part
 
     if progress_path is not None:
         progress_path.parent.mkdir(parents=True, exist_ok=True)

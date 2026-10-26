@@ -7,6 +7,8 @@ from typing import Any, Iterable, Sequence
 
 from enterprise_scout_mcp.output.listed_schema import (
     CAPITAL_COLUMNS,
+    DIVIDENDS_COLUMNS,
+    EXECUTIVES_COLUMNS,
     FACTS_COLUMNS,
     HOLDERS_COLUMNS,
     IDENTITY_COLUMNS,
@@ -22,6 +24,8 @@ _TABLE_COLUMNS: dict[str, tuple[str, ...]] = {
     "capital": CAPITAL_COLUMNS,
     "holders": HOLDERS_COLUMNS,
     "subsidiaries": SUBSIDIARIES_COLUMNS,
+    "executives": EXECUTIVES_COLUMNS,
+    "dividends": DIVIDENDS_COLUMNS,
 }
 
 
