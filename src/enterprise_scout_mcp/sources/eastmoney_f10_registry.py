@@ -110,8 +110,32 @@ F10_TABS: tuple[F10TabSpec, ...] = (
         mapped_page_keys={"gglb": "executives", "cgbd": "exec_holding_changes"},
     ),
     F10TabSpec(
+        tab="盈利预测",
+        page_module="ProfitForecast",
+        mapped_page_keys={
+            "pjtj": "forecast_ratings",
+            "jgyc": "forecast_estimates",
+            "ycmx": "forecast_estimates",
+        },
+        notes="jgyc=一致预期均值; ycmx=机构明细(优先)",
+    ),
+    F10TabSpec(
         tab="同行比较",
-        notes="computed in-warehouse from listed/facts + identity",
+        page_module="IndustryAnalysis",
+        mapped_page_keys={
+            "czxbj": "peer_compare_em.growth",
+            "gzbj": "peer_compare_em.valuation",
+            "dbfxbj": "peer_compare_em.dupont",
+            "scbx": "peer_compare_em.market",
+            "gsgm": "peer_compare_em.scale",
+        },
+        notes="库内分位见 listed_peers.peer_compare; 此处为东财行业对比原始块",
+    ),
+    F10TabSpec(
+        tab="公司大事",
+        page_module="CompanyBigNews",
+        mapped_page_keys={"dstx": "company_events"},
+        notes="dstx=大事提醒; 其余 key(gqzy/dzjy/…) 按需扩展",
     ),
 )
 

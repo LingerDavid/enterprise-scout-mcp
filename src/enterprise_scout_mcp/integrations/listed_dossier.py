@@ -138,21 +138,21 @@ def build_listed_dossier(
                 "period": period,
                 "facts": facts,
             },
-            "分红融资": {
-                "dividends": _filter_security(_read_table(warehouse_dir, "dividends"), security_id),
-                "dividend_summary": sorted(
-                    _filter_security(_read_table(warehouse_dir, "dividend_summary"), security_id),
-                    key=lambda r: str(r.get("year") or ""),
-                    reverse=True,
+            "分红融资": _dividend_financing_tab(warehouse_dir, security_id),
+            "盈利预测": {
+                "ratings": _filter_security(
+                    _read_table(warehouse_dir, "forecast_ratings"),
+                    security_id,
                 ),
-                "seo_issues": sorted(
-                    _filter_security(_read_table(warehouse_dir, "seo_issues"), security_id),
-                    key=lambda r: str(r.get("notice_date") or ""),
-                    reverse=True,
+                "estimates": sorted(
+                    _filter_security(_read_table(warehouse_dir, "forecast_estimates"), security_id),
+                    key=lambda r: (str(r.get("year") or ""), str(r.get("org_name") or "")),
                 ),
-                "allotment_issues": sorted(
-                    _filter_security(_read_table(warehouse_dir, "allotment_issues"), security_id),
-                    key=lambda r: str(r.get("notice_date") or ""),
+            },
+            "公司大事": {
+                "events": sorted(
+                    _filter_security(_read_table(warehouse_dir, "company_events"), security_id),
+                    key=lambda r: str(r.get("event_date") or ""),
                     reverse=True,
                 ),
             },
@@ -183,5 +183,51 @@ def build_listed_dossier(
         },
     }
     if include_peers:
-        dossier["tabs"]["同行比较"] = peer_compare(warehouse_dir, symbol_or_security, period=period)
+        em_peers = _filter_security(_read_table(warehouse_dir, "peer_compare_em"), security_id)
+        by_kind: dict[str, list[dict[str, Any]]] = {}
+        for row in em_peers:
+            by_kind.setdefault(str(row.get("compare_kind") or ""), []).append(row)
+        dossier["tabs"]["同行比较"] = {
+            "warehouse_percentile": peer_compare(warehouse_dir, symbol_or_security, period=period),
+            "growth": by_kind.get("growth", []),
+            "valuation": by_kind.get("valuation", []),
+            "dupont": by_kind.get("dupont", []),
+            "market": by_kind.get("market", []),
+            "scale": by_kind.get("scale", []),
+        }
     return dossier
+
+
+def _dividend_financing_tab(warehouse_dir: Path, security_id: str) -> dict[str, Any]:
+    summary = sorted(
+        _filter_security(_read_table(warehouse_dir, "dividend_summary"), security_id),
+        key=lambda r: str(r.get("year") or ""),
+        reverse=True,
+    )
+    overview: dict[str, Any] = {}
+    if summary:
+        try:
+            total_div = sum(float(r.get("total_dividend") or 0) for r in summary)
+            total_seo = sum(int(float(r.get("seo_count") or 0)) for r in summary)
+            overview = {
+                "dividend_years": len(summary),
+                "total_dividend": str(total_div),
+                "total_seo_count": str(total_seo),
+            }
+        except (TypeError, ValueError):
+            overview = {"dividend_years": len(summary)}
+    return {
+        "overview": overview,
+        "dividends": _filter_security(_read_table(warehouse_dir, "dividends"), security_id),
+        "dividend_summary": summary,
+        "seo_issues": sorted(
+            _filter_security(_read_table(warehouse_dir, "seo_issues"), security_id),
+            key=lambda r: str(r.get("notice_date") or ""),
+            reverse=True,
+        ),
+        "allotment_issues": sorted(
+            _filter_security(_read_table(warehouse_dir, "allotment_issues"), security_id),
+            key=lambda r: str(r.get("notice_date") or ""),
+            reverse=True,
+        ),
+    }

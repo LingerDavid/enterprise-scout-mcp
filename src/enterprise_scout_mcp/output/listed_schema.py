@@ -118,6 +118,58 @@ CONCEPT_BOARD_COLUMNS = (
     "collected_at",
 )
 
+FORECAST_RATING_COLUMNS = (
+    "security_id",
+    "window_code",
+    "window_label",
+    "compre_rating",
+    "compre_rating_num",
+    "rating_org_num",
+    "rating_buy",
+    "rating_add",
+    "rating_neutral",
+    "rating_reduce",
+    "rating_sale",
+    "document_id",
+    "collected_at",
+)
+
+FORECAST_ESTIMATE_COLUMNS = (
+    "security_id",
+    "org_name",
+    "publish_date",
+    "year",
+    "year_mark",
+    "eps",
+    "pe",
+    "parent_net_profit",
+    "rating",
+    "researcher",
+    "document_id",
+    "collected_at",
+)
+
+PEER_COMPARE_EM_COLUMNS = (
+    "security_id",
+    "compare_kind",
+    "compare_name",
+    "report_date",
+    "metrics_json",
+    "document_id",
+    "collected_at",
+)
+
+COMPANY_EVENT_COLUMNS = (
+    "security_id",
+    "event_date",
+    "event_type",
+    "specific_type",
+    "content",
+    "info_code",
+    "document_id",
+    "collected_at",
+)
+
 CAPITAL_COLUMNS = (
     "security_id",
     "as_of",
@@ -509,6 +561,22 @@ def core_highlight_row(**fields: Any) -> dict[str, Any]:
 
 def concept_board_row(**fields: Any) -> dict[str, Any]:
     return _row(CONCEPT_BOARD_COLUMNS, **fields)
+
+
+def forecast_rating_row(**fields: Any) -> dict[str, Any]:
+    return _row(FORECAST_RATING_COLUMNS, **fields)
+
+
+def forecast_estimate_row(**fields: Any) -> dict[str, Any]:
+    return _row(FORECAST_ESTIMATE_COLUMNS, **fields)
+
+
+def peer_compare_em_row(**fields: Any) -> dict[str, Any]:
+    return _row(PEER_COMPARE_EM_COLUMNS, **fields)
+
+
+def company_event_row(**fields: Any) -> dict[str, Any]:
+    return _row(COMPANY_EVENT_COLUMNS, **fields)
 
 
 def capital_row(**fields: Any) -> dict[str, Any]:
