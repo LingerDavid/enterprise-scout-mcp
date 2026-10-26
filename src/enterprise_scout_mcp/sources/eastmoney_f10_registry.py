@@ -39,8 +39,9 @@ F10_TABS: tuple[F10TabSpec, ...] = (
             "sjkzr": "listed_control",
             "gdrs": "holder_stats",
             "jgcc": "institutional_holdings",
+            "jjcg": "fund_holdings",
         },
-        notes="jjcg (基金持股)/ltgf unmapped",
+        notes="ltgf (流通股本结构) unmapped",
     ),
     F10TabSpec(
         tab="经营分析",

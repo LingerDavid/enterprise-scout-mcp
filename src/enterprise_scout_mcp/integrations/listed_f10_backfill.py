@@ -17,6 +17,7 @@ from enterprise_scout_mcp.sources.eastmoney_capital import fetch_capital_structu
 from enterprise_scout_mcp.sources.eastmoney_control import fetch_actual_controller
 from enterprise_scout_mcp.sources.eastmoney_dividends import fetch_dividends
 from enterprise_scout_mcp.sources.eastmoney_exec_trades import fetch_exec_holding_changes
+from enterprise_scout_mcp.sources.eastmoney_fund_holdings import fetch_fund_holdings
 from enterprise_scout_mcp.sources.eastmoney_executives import fetch_executives
 from enterprise_scout_mcp.sources.eastmoney_float_holders import fetch_float_holders
 from enterprise_scout_mcp.sources.eastmoney_holder_stats import fetch_holder_stats
@@ -32,6 +33,7 @@ _DEFAULT_TABLES = (
     "float_holders",
     "holder_stats",
     "institutional_holdings",
+    "fund_holdings",
     "ipo_profile",
     "capital",
     "executives",
@@ -56,6 +58,9 @@ def _fetch_table(table: str, sym: str, identity_row: dict[str, Any], collected_a
     if table == "institutional_holdings":
         rep = fetch_institutional_holdings(sym, collected_at=collected_at)
         return {"rows": rep.get("institutional_holdings") or [], "skipped": rep.get("skipped") or []}
+    if table == "fund_holdings":
+        rep = fetch_fund_holdings(sym, collected_at=collected_at)
+        return {"rows": rep.get("fund_holdings") or [], "skipped": rep.get("skipped") or []}
     if table == "holder_stats":
         rep = fetch_holder_stats(sym, collected_at=collected_at)
         return {"rows": rep.get("holder_stats") or [], "skipped": rep.get("skipped") or []}

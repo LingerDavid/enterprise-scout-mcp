@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enterprise_scout_mcp.sources.eastmoney_exec_trades import exec_trades_from_f10_payload
+from enterprise_scout_mcp.sources.eastmoney_fund_holdings import fund_holdings_from_f10_payload
 from enterprise_scout_mcp.sources.eastmoney_f10_probe import summarize_page_ajax_payload
 from enterprise_scout_mcp.sources.eastmoney_float_holders import float_holders_from_f10_payload
 from enterprise_scout_mcp.sources.eastmoney_holder_stats import holder_stats_from_f10_payload
@@ -84,6 +85,30 @@ def test_institutional_from_jgcc() -> None:
     )
     assert rows[0]["org_type"] == "基金"
     assert rows[0]["org_count"] == "120"
+
+
+def test_fund_holdings_from_jjcq() -> None:
+    rows = fund_holdings_from_f10_payload(
+        {
+            "jjcg": [
+                {
+                    "REPORT_DATE": "2025-12-31",
+                    "HOLDER_NAME": "易方达蓝筹",
+                    "FUND_CODE": "005827",
+                    "ORG_TYPE": "01",
+                    "TOTAL_SHARES": 1000000,
+                    "HOLD_VALUE": 25000000,
+                    "TOTALSHARES_RATIO": 0.42,
+                    "FREESHARES_RATIO": 0.51,
+                    "NETVALUE_RATIO": 1.2,
+                }
+            ]
+        },
+        security_id="SZSE:002271",
+        collected_at="t0",
+    )
+    assert rows[0]["fund_name"] == "易方达蓝筹"
+    assert rows[0]["fund_code"] == "005827"
 
 
 def test_exec_trades_from_cgbd() -> None:

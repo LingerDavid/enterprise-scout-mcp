@@ -83,6 +83,11 @@ def build_listed_dossier(
                     key=lambda r: str(r.get("as_of") or ""),
                     reverse=True,
                 ),
+                "fund_holdings": sorted(
+                    _filter_security(_read_table(warehouse_dir, "fund_holdings"), security_id),
+                    key=lambda r: str(r.get("as_of") or ""),
+                    reverse=True,
+                ),
                 "holder_stats": sorted(
                     _filter_security(_read_table(warehouse_dir, "holder_stats"), security_id),
                     key=lambda r: str(r.get("as_of") or ""),

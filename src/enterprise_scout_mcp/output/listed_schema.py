@@ -224,6 +224,21 @@ EXEC_HOLDING_CHANGES_COLUMNS = (
     "collected_at",
 )
 
+FUND_HOLDINGS_COLUMNS = (
+    "security_id",
+    "as_of",
+    "fund_name",
+    "fund_code",
+    "org_type",
+    "shares",
+    "hold_value",
+    "pct_total",
+    "pct_float",
+    "netvalue_ratio",
+    "document_id",
+    "collected_at",
+)
+
 # Profit waterfall order (display). gross_profit may be derived at read time.
 INCOME_ITEM_CODES = (
     "revenue",
@@ -386,3 +401,7 @@ def institutional_holding_row(**fields: Any) -> dict[str, Any]:
 
 def exec_holding_change_row(**fields: Any) -> dict[str, Any]:
     return _row(EXEC_HOLDING_CHANGES_COLUMNS, **fields)
+
+
+def fund_holding_row(**fields: Any) -> dict[str, Any]:
+    return _row(FUND_HOLDINGS_COLUMNS, **fields)
