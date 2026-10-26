@@ -149,13 +149,7 @@ def build_listed_dossier(
                     key=lambda r: (str(r.get("year") or ""), str(r.get("org_name") or "")),
                 ),
             },
-            "公司大事": {
-                "events": sorted(
-                    _filter_security(_read_table(warehouse_dir, "company_events"), security_id),
-                    key=lambda r: str(r.get("event_date") or ""),
-                    reverse=True,
-                ),
-            },
+            "公司大事": _company_events_tab(warehouse_dir, security_id),
             "股本结构": {
                 "capital": _filter_security(_read_table(warehouse_dir, "capital"), security_id),
                 "capital_history": sorted(
@@ -196,6 +190,26 @@ def build_listed_dossier(
             "scale": by_kind.get("scale", []),
         }
     return dossier
+
+
+def _company_events_tab(warehouse_dir: Path, security_id: str) -> dict[str, Any]:
+    events = sorted(
+        _filter_security(_read_table(warehouse_dir, "company_events"), security_id),
+        key=lambda r: str(r.get("event_date") or ""),
+        reverse=True,
+    )
+    blocks = sorted(
+        _filter_security(_read_table(warehouse_dir, "company_event_blocks"), security_id),
+        key=lambda r: str(r.get("event_date") or ""),
+        reverse=True,
+    )
+    by_kind: dict[str, list[dict[str, Any]]] = {}
+    for row in blocks:
+        by_kind.setdefault(str(row.get("block_kind") or ""), []).append(row)
+    return {
+        "events": events,
+        "blocks": by_kind,
+    }
 
 
 def _dividend_financing_tab(warehouse_dir: Path, security_id: str) -> dict[str, Any]:

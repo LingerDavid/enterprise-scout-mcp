@@ -48,6 +48,7 @@ DEFAULT_LISTED_F10_TABLES = (
     "forecast_estimates",
     "peer_compare_em",
     "company_events",
+    "company_event_blocks",
     "holders",
     "float_holders",
     "holder_stats",
@@ -79,6 +80,7 @@ def _fetch_table(
     conception_cache: dict[str, dict[str, Any]] | None = None,
     bonus_cache: dict[str, dict[str, Any]] | None = None,
     forecast_cache: dict[str, dict[str, Any]] | None = None,
+    event_cache: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     issuer_id = str(identity_row.get("issuer_id") or "").strip()
     if table == "company_profile":
@@ -111,9 +113,13 @@ def _fetch_table(
     if table == "peer_compare_em":
         rep = fetch_peer_analysis(sym, collected_at=collected_at)
         return {"rows": rep.get("peer_compare_em") or [], "skipped": rep.get("skipped") or []}
-    if table == "company_events":
-        rep = fetch_company_events(sym, collected_at=collected_at)
-        return {"rows": rep.get("company_events") or [], "skipped": rep.get("skipped") or []}
+    if table in {"company_events", "company_event_blocks"}:
+        cache = event_cache if event_cache is not None else {}
+        if sym not in cache:
+            cache[sym] = fetch_company_events(sym, collected_at=collected_at)
+        rep = cache[sym]
+        key = "company_events" if table == "company_events" else "company_event_blocks"
+        return {"rows": rep.get(key) or [], "skipped": rep.get("skipped") or []}
     if table == "holders":
         rows = fetch_top_holders(sym, collected_at=collected_at)
         return {"rows": rows, "skipped": [] if rows else ["empty_sdgd"]}
@@ -225,6 +231,7 @@ def backfill_listed_f10(
     conception_cache: dict[str, dict[str, Any]] = {}
     bonus_cache: dict[str, dict[str, Any]] = {}
     forecast_cache: dict[str, dict[str, Any]] = {}
+    event_cache: dict[str, dict[str, Any]] = {}
 
     for table in tables:
         dest = "listed_control" if table == "control" else table
@@ -244,6 +251,7 @@ def backfill_listed_f10(
                 conception_cache=conception_cache,
                 bonus_cache=bonus_cache,
                 forecast_cache=forecast_cache,
+                event_cache=event_cache,
             )
             rows = list(rep.get("rows") or [])
             return sym, rows, {"skipped": rep.get("skipped")}

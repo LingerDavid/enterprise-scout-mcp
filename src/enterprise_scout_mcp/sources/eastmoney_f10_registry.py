@@ -134,8 +134,17 @@ F10_TABS: tuple[F10TabSpec, ...] = (
     F10TabSpec(
         tab="公司大事",
         page_module="CompanyBigNews",
-        mapped_page_keys={"dstx": "company_events"},
-        notes="dstx=大事提醒; 其余 key(gqzy/dzjy/…) 按需扩展",
+        mapped_page_keys={
+            "dstx": "company_events",
+            "gqzy": "company_event_blocks.pledge",
+            "dwdb": "company_event_blocks.guarantee",
+            "dzjy": "company_event_blocks.block_trade",
+            "lhbd": "company_event_blocks.dragon_tiger",
+            "rzrq": "company_event_blocks.margin",
+            "wgcl": "company_event_blocks.violation",
+            "ggcgbd": "company_event_blocks.exec_share_change",
+        },
+        notes="dstx=大事提醒; gqzy/dwdb/dzjy/lhbd/rzrq/wgcl/ggcgbd → company_event_blocks",
     ),
 )
 

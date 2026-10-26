@@ -22,6 +22,7 @@ def test_default_tables_include_workforce() -> None:
     assert "core_highlights" in DEFAULT_LISTED_F10_TABLES
     assert "forecast_ratings" in DEFAULT_LISTED_F10_TABLES
     assert "company_events" in DEFAULT_LISTED_F10_TABLES
+    assert "company_event_blocks" in DEFAULT_LISTED_F10_TABLES
 
 
 def test_backfill_symbol_filter(tmp_path: Path) -> None:
