@@ -17,6 +17,7 @@ from enterprise_scout_mcp.output.listed_schema import identity_row
 def test_default_tables_include_workforce() -> None:
     assert "workforce" in DEFAULT_LISTED_F10_TABLES
     assert "float_holders" in DEFAULT_LISTED_F10_TABLES
+    assert "company_profile" in DEFAULT_LISTED_F10_TABLES
     assert "business_scope" in DEFAULT_LISTED_F10_TABLES
     assert "core_highlights" in DEFAULT_LISTED_F10_TABLES
 

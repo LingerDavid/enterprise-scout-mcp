@@ -12,6 +12,7 @@ from enterprise_scout_mcp.output.listed_schema import (
     FACTS_COLUMNS,
     HOLDERS_COLUMNS,
     IDENTITY_COLUMNS,
+    COMPANY_PROFILE_COLUMNS,
     LISTED_CONTROL_COLUMNS,
     SEGMENTS_COLUMNS,
     BUSINESS_SCOPE_COLUMNS,
@@ -37,6 +38,7 @@ from enterprise_scout_mcp.output.listed_schema import (
 
 _TABLE_COLUMNS: dict[str, tuple[str, ...]] = {
     "identity": IDENTITY_COLUMNS,
+    "company_profile": COMPANY_PROFILE_COLUMNS,
     "facts": FACTS_COLUMNS,
     "segments": SEGMENTS_COLUMNS,
     "business_scope": BUSINESS_SCOPE_COLUMNS,

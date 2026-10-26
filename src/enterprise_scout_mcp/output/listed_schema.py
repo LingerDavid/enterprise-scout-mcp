@@ -22,6 +22,28 @@ IDENTITY_COLUMNS = (
     "collected_at",
 )
 
+# CompanySurvey.jbzl extended profile (one row per listing).
+COMPANY_PROFILE_COLUMNS = (
+    "security_id",
+    "issuer_name",
+    "org_profile",
+    "chairman",
+    "president",
+    "secretary",
+    "legal_person",
+    "org_web",
+    "org_tel",
+    "org_email",
+    "office_address",
+    "reg_address",
+    "reg_capital",
+    "emp_num",
+    "csrc_industry",
+    "em_industry",
+    "document_id",
+    "collected_at",
+)
+
 FACTS_COLUMNS = (
     "issuer_id",
     "period",
@@ -459,6 +481,10 @@ def _row(columns: tuple[str, ...], **fields: Any) -> dict[str, Any]:
 
 def identity_row(**fields: Any) -> dict[str, Any]:
     return _row(IDENTITY_COLUMNS, **fields)
+
+
+def company_profile_row(**fields: Any) -> dict[str, Any]:
+    return _row(COMPANY_PROFILE_COLUMNS, **fields)
 
 
 def facts_row(**fields: Any) -> dict[str, Any]:

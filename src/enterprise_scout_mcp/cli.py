@@ -513,11 +513,13 @@ def cmd_corpus_backfill_facts_em(args: argparse.Namespace) -> int:
     warehouse_dir = _dir(config.output.warehouse_dir)
     limit = int(args.limit) if int(args.limit) > 0 else None
     progress = Path(args.progress) if args.progress else None
+    symbols = tuple(s.strip() for s in str(getattr(args, "symbol", "") or "").split(",") if s.strip()) or None
     summary = backfill_listed_facts_em(
         warehouse_dir,
         workers=int(args.workers),
         limit=limit,
         page_size=int(args.page_size),
+        symbols=symbols,
         progress_path=progress,
     )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
@@ -1148,6 +1150,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     corpus_facts_em.add_argument("--workers", type=int, default=12)
     corpus_facts_em.add_argument("--limit", type=int, default=0, help="Max symbols (0=all)")
+    corpus_facts_em.add_argument(
+        "--symbol",
+        default="",
+        help="Comma-separated symbols (e.g. 002271.SZ). Default: all identity rows",
+    )
     corpus_facts_em.add_argument("--page-size", type=int, default=12, help="Periods per statement")
     corpus_facts_em.add_argument("--progress", default="", help="Append summary JSONL path")
     corpus_facts_em.set_defaults(func=cmd_corpus_backfill_facts_em, corpus_cmd="backfill-facts-em")

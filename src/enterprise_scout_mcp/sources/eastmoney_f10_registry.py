@@ -28,7 +28,11 @@ F10_TABS: tuple[F10TabSpec, ...] = (
     F10TabSpec(
         tab="公司概况",
         page_module="CompanySurvey",
-        mapped_page_keys={"jbzl": "identity", "fxxg": "ipo_profile"},
+        mapped_page_keys={
+            "jbzl": "company_profile",
+            "fxxg": "ipo_profile",
+        },
+        notes="jbzl also feeds identity enrichment via sample-listed; company_profile holds full jbzl snapshot",
     ),
     F10TabSpec(
         tab="股东研究",

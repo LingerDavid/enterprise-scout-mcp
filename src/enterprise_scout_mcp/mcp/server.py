@@ -295,6 +295,7 @@ def create_mcp_server():
         tables: str = "",
         workers: int = 12,
         limit: int = 0,
+        symbol: str = "",
     ) -> str:
         """Batch backfill East Money F10 → listed warehouse (segments/holders/capital/…)."""
         from enterprise_scout_mcp.integrations.listed_f10_backfill import (
@@ -304,25 +305,34 @@ def create_mcp_server():
 
         config = load_config()
         picked = tuple(t.strip() for t in tables.split(",") if t.strip()) or DEFAULT_LISTED_F10_TABLES
+        symbols = tuple(s.strip() for s in symbol.split(",") if s.strip()) or None
         summary = backfill_listed_f10(
             Path(config.output.warehouse_dir),
             tables=picked,
             workers=workers,
             limit=limit if limit > 0 else None,
+            symbols=symbols,
         )
         return json.dumps(summary, ensure_ascii=False)
 
     @mcp.tool()
-    def listed_backfill_facts_em(workers: int = 12, limit: int = 0, page_size: int = 12) -> str:
+    def listed_backfill_facts_em(
+        workers: int = 12,
+        limit: int = 0,
+        page_size: int = 12,
+        symbol: str = "",
+    ) -> str:
         """Backfill listed/facts from East Money datacenter (transition until QMT panel exists)."""
         from enterprise_scout_mcp.integrations.listed_facts_em_backfill import backfill_listed_facts_em
 
         config = load_config()
+        symbols = tuple(s.strip() for s in symbol.split(",") if s.strip()) or None
         summary = backfill_listed_facts_em(
             Path(config.output.warehouse_dir),
             workers=workers,
             limit=limit if limit > 0 else None,
             page_size=page_size,
+            symbols=symbols,
         )
         return json.dumps(summary, ensure_ascii=False)
 

@@ -29,11 +29,13 @@ from enterprise_scout_mcp.sources.eastmoney_holders import fetch_top_holders
 from enterprise_scout_mcp.sources.eastmoney_institutional import fetch_institutional_holdings
 from enterprise_scout_mcp.sources.eastmoney_ipo_profile import fetch_ipo_profile
 from enterprise_scout_mcp.sources.eastmoney_business_narratives import fetch_business_narratives
+from enterprise_scout_mcp.sources.eastmoney_company_profile import fetch_company_profile
 from enterprise_scout_mcp.sources.eastmoney_core_conception import fetch_core_conception
 from enterprise_scout_mcp.sources.eastmoney_segments import fetch_business_segments
 from enterprise_scout_mcp.sources.eastmoney_workforce import fetch_workforce_metrics
 
 DEFAULT_LISTED_F10_TABLES = (
+    "company_profile",
     "segments",
     "business_scope",
     "business_review",
@@ -60,23 +62,37 @@ DEFAULT_LISTED_F10_TABLES = (
 )
 
 
-def _fetch_table(table: str, sym: str, identity_row: dict[str, Any], collected_at: str) -> dict[str, Any]:
+def _fetch_table(
+    table: str,
+    sym: str,
+    identity_row: dict[str, Any],
+    collected_at: str,
+    *,
+    narrative_cache: dict[str, dict[str, Any]] | None = None,
+    conception_cache: dict[str, dict[str, Any]] | None = None,
+    bonus_cache: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     issuer_id = str(identity_row.get("issuer_id") or "").strip()
+    if table == "company_profile":
+        rep = fetch_company_profile(sym, collected_at=collected_at)
+        return {"rows": rep.get("company_profile") or [], "skipped": rep.get("skipped") or []}
     if table == "segments":
         rep = fetch_business_segments(sym, issuer_id=issuer_id)
         return {"rows": rep.get("segments") or [], "skipped": rep.get("skipped") or []}
-    if table == "business_scope":
-        rep = fetch_business_narratives(sym, collected_at=collected_at)
-        return {"rows": rep.get("business_scope") or [], "skipped": rep.get("skipped") or []}
-    if table == "business_review":
-        rep = fetch_business_narratives(sym, collected_at=collected_at)
-        return {"rows": rep.get("business_review") or [], "skipped": rep.get("skipped") or []}
-    if table == "core_highlights":
-        rep = fetch_core_conception(sym, collected_at=collected_at)
-        return {"rows": rep.get("core_highlights") or [], "skipped": rep.get("skipped") or []}
-    if table == "concept_boards":
-        rep = fetch_core_conception(sym, collected_at=collected_at)
-        return {"rows": rep.get("concept_boards") or [], "skipped": rep.get("skipped") or []}
+    if table in {"business_scope", "business_review"}:
+        cache = narrative_cache if narrative_cache is not None else {}
+        if sym not in cache:
+            cache[sym] = fetch_business_narratives(sym, collected_at=collected_at)
+        rep = cache[sym]
+        key = "business_scope" if table == "business_scope" else "business_review"
+        return {"rows": rep.get(key) or [], "skipped": rep.get("skipped") or []}
+    if table in {"core_highlights", "concept_boards"}:
+        cache = conception_cache if conception_cache is not None else {}
+        if sym not in cache:
+            cache[sym] = fetch_core_conception(sym, collected_at=collected_at)
+        rep = cache[sym]
+        key = "core_highlights" if table == "core_highlights" else "concept_boards"
+        return {"rows": rep.get(key) or [], "skipped": rep.get("skipped") or []}
     if table == "holders":
         rows = fetch_top_holders(sym, collected_at=collected_at)
         return {"rows": rows, "skipped": [] if rows else ["empty_sdgd"]}
@@ -113,15 +129,12 @@ def _fetch_table(table: str, sym: str, identity_row: dict[str, Any], collected_a
     if table == "dividends":
         rep = fetch_dividends(sym, collected_at=collected_at)
         return {"rows": rep.get("dividends") or [], "skipped": rep.get("skipped") or []}
-    if table == "dividend_summary":
-        rep = fetch_bonus_extras(sym, collected_at=collected_at)
-        return {"rows": rep.get("dividend_summary") or [], "skipped": rep.get("skipped") or []}
-    if table == "seo_issues":
-        rep = fetch_bonus_extras(sym, collected_at=collected_at)
-        return {"rows": rep.get("seo_issues") or [], "skipped": rep.get("skipped") or []}
-    if table == "allotment_issues":
-        rep = fetch_bonus_extras(sym, collected_at=collected_at)
-        return {"rows": rep.get("allotment_issues") or [], "skipped": rep.get("skipped") or []}
+    if table in {"dividend_summary", "seo_issues", "allotment_issues"}:
+        cache = bonus_cache if bonus_cache is not None else {}
+        if sym not in cache:
+            cache[sym] = fetch_bonus_extras(sym, collected_at=collected_at)
+        rep = cache[sym]
+        return {"rows": rep.get(table) or [], "skipped": rep.get("skipped") or []}
     if table == "restricted_unlock":
         rep = fetch_restricted_unlock(sym, collected_at=collected_at)
         return {"rows": rep.get("restricted_unlock") or [], "skipped": rep.get("skipped") or []}
@@ -187,6 +200,10 @@ def backfill_listed_f10(
     touched_security = {str(r.get("security_id") or "") for r in identity if r.get("security_id")}
     touched_issuer = {str(r.get("issuer_id") or "") for r in identity if r.get("issuer_id")}
 
+    narrative_cache: dict[str, dict[str, Any]] = {}
+    conception_cache: dict[str, dict[str, Any]] = {}
+    bonus_cache: dict[str, dict[str, Any]] = {}
+
     for table in tables:
         dest = "listed_control" if table == "control" else table
         drop_key = "issuer_id" if table in {"segments", "control", "workforce"} else "security_id"
@@ -196,7 +213,15 @@ def backfill_listed_f10(
             sym = to_tradecraft_symbol(str(row.get("security_id") or ""))
             if not sym:
                 return "", [], {"skipped": ["no_symbol"]}
-            rep = _fetch_table(_table, sym, row, collected_at)
+            rep = _fetch_table(
+                _table,
+                sym,
+                row,
+                collected_at,
+                narrative_cache=narrative_cache,
+                conception_cache=conception_cache,
+                bonus_cache=bonus_cache,
+            )
             rows = list(rep.get("rows") or [])
             return sym, rows, {"skipped": rep.get("skipped")}
 

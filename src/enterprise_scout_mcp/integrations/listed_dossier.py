@@ -56,7 +56,12 @@ def build_listed_dossier(
 
     security_id, code, _column = listing
     identity_rows = _read_table(warehouse_dir, "identity")
-    identity = next((r for r in identity_rows if str(r.get("security_id") or "") == security_id), None)
+    identity_matches = [r for r in identity_rows if str(r.get("security_id") or "") == security_id]
+    identity = (
+        max(identity_matches, key=lambda r: str(r.get("collected_at") or ""))
+        if identity_matches
+        else None
+    )
     if identity is None:
         return {"ok": False, "security_id": security_id, "skipped": ["no_identity"]}
 
@@ -73,6 +78,7 @@ def build_listed_dossier(
         "tabs": {
             "公司概况": {
                 **identity,
+                "profile": _filter_security(_read_table(warehouse_dir, "company_profile"), security_id),
                 "ipo_profile": _filter_security(_read_table(warehouse_dir, "ipo_profile"), security_id),
             },
             "股东研究": {

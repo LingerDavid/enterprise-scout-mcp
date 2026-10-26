@@ -21,20 +21,45 @@ from enterprise_scout_mcp.output.listed_schema import to_tradecraft_symbol
 from enterprise_scout_mcp.sources.eastmoney_statements import fetch_statement_rows
 
 
+def _dedupe_identity(identity: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for row in identity:
+        sid = str(row.get("security_id") or "").strip()
+        if sid and sid in seen:
+            continue
+        if sid:
+            seen.add(sid)
+        out.append(row)
+    return out
+
+
 def backfill_listed_facts_em(
     warehouse_dir: Path,
     *,
     workers: int = 12,
     limit: int | None = None,
     page_size: int = 12,
+    symbols: tuple[str, ...] | None = None,
     progress_path: Path | None = None,
 ) -> dict[str, Any]:
     """Fetch EM statements per identity row; merge into listed/facts."""
     warehouse_dir = Path(warehouse_dir)
     collected_at = datetime.now(timezone.utc).isoformat()
     identity = read_identity_rows(warehouse_dir)
+    if symbols:
+        want = {str(s or "").strip().upper() for s in symbols if str(s or "").strip()}
+        filtered: list[dict[str, Any]] = []
+        for row in identity:
+            sid = str(row.get("security_id") or "").strip().upper()
+            sym = to_tradecraft_symbol(sid) or ""
+            code = str(row.get("code") or "").strip()
+            if sid in want or sym in want or code in want or f"{code}.SZ" in want or f"{code}.SH" in want:
+                filtered.append(row)
+        identity = filtered
     if limit is not None:
         identity = identity[: max(0, int(limit))]
+    identity = _dedupe_identity(identity)
     issuer_map = issuer_id_by_security(warehouse_dir)
 
     summary: dict[str, Any] = {
