@@ -48,7 +48,7 @@ def build_listed_dossier(
     *,
     include_peers: bool = True,
 ) -> dict[str, Any]:
-    """Return tabbed dossier: 概况/股东/经营/财务/分红/股本/高管/控制/同行."""
+    """Return tabbed dossier: 概况/股东/经营/员工竞争力/财务/分红/股本/高管/控制/同行."""
     warehouse_dir = Path(warehouse_dir)
     listing = resolve_listing(symbol_or_security)
     if listing is None:
@@ -78,6 +78,17 @@ def build_listed_dossier(
             },
             "经营分析": {
                 "segments": _filter_issuer(_read_table(warehouse_dir, "segments"), issuer_id),
+            },
+            "员工及业务竞争力": {
+                "workforce": sorted(
+                    _filter_issuer(_read_table(warehouse_dir, "workforce"), issuer_id),
+                    key=lambda r: str(r.get("period") or ""),
+                    reverse=True,
+                ),
+                "education": _filter_issuer(
+                    _read_table(warehouse_dir, "workforce_education"),
+                    issuer_id,
+                ),
             },
             "财务分析": {
                 "period": period,

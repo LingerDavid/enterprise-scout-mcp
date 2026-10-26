@@ -15,6 +15,8 @@ from enterprise_scout_mcp.output.listed_schema import (
     LISTED_CONTROL_COLUMNS,
     SEGMENTS_COLUMNS,
     SUBSIDIARIES_COLUMNS,
+    WORKFORCE_COLUMNS,
+    WORKFORCE_EDUCATION_COLUMNS,
 )
 
 _TABLE_COLUMNS: dict[str, tuple[str, ...]] = {
@@ -26,6 +28,8 @@ _TABLE_COLUMNS: dict[str, tuple[str, ...]] = {
     "subsidiaries": SUBSIDIARIES_COLUMNS,
     "executives": EXECUTIVES_COLUMNS,
     "dividends": DIVIDENDS_COLUMNS,
+    "workforce": WORKFORCE_COLUMNS,
+    "workforce_education": WORKFORCE_EDUCATION_COLUMNS,
 }
 
 

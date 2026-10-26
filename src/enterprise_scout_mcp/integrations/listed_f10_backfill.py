@@ -19,6 +19,7 @@ from enterprise_scout_mcp.sources.eastmoney_dividends import fetch_dividends
 from enterprise_scout_mcp.sources.eastmoney_executives import fetch_executives
 from enterprise_scout_mcp.sources.eastmoney_holders import fetch_top_holders
 from enterprise_scout_mcp.sources.eastmoney_segments import fetch_business_segments
+from enterprise_scout_mcp.sources.eastmoney_workforce import fetch_workforce_metrics
 
 _DEFAULT_TABLES = (
     "segments",
@@ -27,6 +28,7 @@ _DEFAULT_TABLES = (
     "executives",
     "dividends",
     "control",
+    "workforce",
 )
 
 
@@ -50,6 +52,9 @@ def _fetch_table(table: str, sym: str, identity_row: dict[str, Any], collected_a
     if table == "control":
         rep = fetch_actual_controller(sym, issuer_id=issuer_id, collected_at=collected_at)
         return {"rows": rep.get("control") or [], "skipped": rep.get("skipped") or []}
+    if table == "workforce":
+        rep = fetch_workforce_metrics(sym, issuer_id=issuer_id)
+        return {"rows": rep.get("workforce") or [], "skipped": rep.get("skipped") or []}
     return {"rows": [], "skipped": [f"unknown_table:{table}"]}
 
 
@@ -85,7 +90,7 @@ def backfill_listed_f10(
 
     for table in tables:
         dest = "listed_control" if table == "control" else table
-        drop_key = "issuer_id" if table in {"segments", "control"} else "security_id"
+        drop_key = "issuer_id" if table in {"segments", "control", "workforce"} else "security_id"
         drop_values = touched_issuer if drop_key == "issuer_id" else touched_security
 
         def fetch_one(row: dict[str, Any], *, _table: str = table) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:

@@ -8,7 +8,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from enterprise_scout_mcp.integrations.listed_dossier import build_listed_dossier
-from enterprise_scout_mcp.output.listed_schema import identity_row, segments_row
+from enterprise_scout_mcp.output.listed_schema import identity_row, segments_row, workforce_row
 
 
 def _write(path: Path, rows: list[dict]) -> None:
@@ -54,8 +54,25 @@ def test_build_listed_dossier_tabs(tmp_path: Path) -> None:
             )
         ],
     )
+    _write(
+        wh / "listed" / "workforce" / "part.parquet",
+        [
+            workforce_row(
+                issuer_id=iid,
+                period="2025",
+                staff_num="10318",
+                avg_salary="277051.5048",
+                avg_revenue="2672868.0728",
+                avg_net_profit="10977.6188",
+                document_id="t",
+                collected_at="t0",
+            )
+        ],
+    )
     dossier = build_listed_dossier(wh, "002271.SZ", include_peers=False)
     assert dossier["ok"] is True
     assert dossier["symbol"] == "002271.SZ"
     assert dossier["tabs"]["公司概况"]["issuer_name"] == "东方雨虹"
     assert len(dossier["tabs"]["经营分析"]["segments"]) == 1
+    assert dossier["tabs"]["员工及业务竞争力"]["workforce"][0]["period"] == "2025"
+    assert dossier["tabs"]["员工及业务竞争力"]["workforce"][0]["staff_num"] == "10318"

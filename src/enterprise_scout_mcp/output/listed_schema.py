@@ -133,6 +133,33 @@ DIVIDENDS_COLUMNS = (
     "collected_at",
 )
 
+# Annual workforce competitiveness (CNY yuan unless noted).
+WORKFORCE_COLUMNS = (
+    "issuer_id",
+    "period",
+    "staff_num",
+    "avg_salary",
+    "avg_revenue",
+    "avg_net_profit",
+    "rd_personnel",
+    "rd_ratio",
+    "rd_expend",
+    "pay_staff_cash",
+    "staff_salary_payable",
+    "document_id",
+    "collected_at",
+)
+
+# Latest education mix snapshot (percent strings, sum ≈ 100).
+WORKFORCE_EDUCATION_COLUMNS = (
+    "issuer_id",
+    "as_of",
+    "bucket",
+    "pct",
+    "document_id",
+    "collected_at",
+)
+
 # Profit waterfall order (display). gross_profit may be derived at read time.
 INCOME_ITEM_CODES = (
     "revenue",
@@ -267,3 +294,11 @@ def executives_row(**fields: Any) -> dict[str, Any]:
 
 def dividends_row(**fields: Any) -> dict[str, Any]:
     return _row(DIVIDENDS_COLUMNS, **fields)
+
+
+def workforce_row(**fields: Any) -> dict[str, Any]:
+    return _row(WORKFORCE_COLUMNS, **fields)
+
+
+def workforce_education_row(**fields: Any) -> dict[str, Any]:
+    return _row(WORKFORCE_EDUCATION_COLUMNS, **fields)
