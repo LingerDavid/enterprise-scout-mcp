@@ -469,7 +469,10 @@ def cmd_corpus_backfill_segments(args: argparse.Namespace) -> int:
 
 def cmd_corpus_backfill_f10(args: argparse.Namespace) -> int:
     from enterprise_scout_mcp.config import resolve_project_root
-    from enterprise_scout_mcp.integrations.listed_f10_backfill import backfill_listed_f10
+    from enterprise_scout_mcp.integrations.listed_f10_backfill import (
+        DEFAULT_LISTED_F10_TABLES,
+        backfill_listed_f10,
+    )
 
     config = load_config(args.config)
     root = resolve_project_root()
@@ -482,18 +485,13 @@ def cmd_corpus_backfill_f10(args: argparse.Namespace) -> int:
     limit = int(args.limit) if int(args.limit) > 0 else None
     progress = Path(args.progress) if args.progress else None
     tables = tuple(t.strip() for t in str(args.tables or "").split(",") if t.strip()) or None
+    symbols = tuple(s.strip() for s in str(getattr(args, "symbol", "") or "").split(",") if s.strip()) or None
     summary = backfill_listed_f10(
         warehouse_dir,
-        tables=tables or (
-            "segments",
-            "holders",
-            "capital",
-            "executives",
-            "dividends",
-            "control",
-        ),
+        tables=tables or DEFAULT_LISTED_F10_TABLES,
         workers=int(args.workers),
         limit=limit,
+        symbols=symbols,
         progress_path=progress,
     )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
@@ -1117,15 +1115,20 @@ def build_parser() -> argparse.ArgumentParser:
     corpus_segments.set_defaults(func=cmd_corpus_backfill_segments, corpus_cmd="backfill-segments")
     corpus_f10 = corpus_sub.add_parser(
         "backfill-f10",
-        help="Backfill F10 tabs: segments/holders/capital/executives/dividends/control",
+        help="Backfill all East Money F10 tabs into listed/* warehouse tables",
     )
     corpus_f10.add_argument("--workers", type=int, default=12, help="Parallel fetch workers")
     corpus_f10.add_argument("--limit", type=int, default=0, help="Max symbols (0=all)")
+    corpus_f10.add_argument(
+        "--symbol",
+        default="",
+        help="Comma-separated symbols to backfill (e.g. 002271.SZ). Default: all identity rows",
+    )
     corpus_f10.add_argument("--progress", default="", help="Append summary JSONL path")
     corpus_f10.add_argument(
         "--tables",
         default="",
-        help="Comma list: segments,holders,capital,executives,dividends,control (default all)",
+        help="Comma list of tables (default: all F10 tables)",
     )
     corpus_f10.set_defaults(func=cmd_corpus_backfill_f10, corpus_cmd="backfill-f10")
     corpus_facts = corpus_sub.add_parser(

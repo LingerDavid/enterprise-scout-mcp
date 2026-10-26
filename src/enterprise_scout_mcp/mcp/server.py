@@ -297,17 +297,13 @@ def create_mcp_server():
         limit: int = 0,
     ) -> str:
         """Batch backfill East Money F10 → listed warehouse (segments/holders/capital/…)."""
-        from enterprise_scout_mcp.integrations.listed_f10_backfill import backfill_listed_f10
+        from enterprise_scout_mcp.integrations.listed_f10_backfill import (
+            DEFAULT_LISTED_F10_TABLES,
+            backfill_listed_f10,
+        )
 
         config = load_config()
-        picked = tuple(t.strip() for t in tables.split(",") if t.strip()) or (
-            "segments",
-            "holders",
-            "capital",
-            "executives",
-            "dividends",
-            "control",
-        )
+        picked = tuple(t.strip() for t in tables.split(",") if t.strip()) or DEFAULT_LISTED_F10_TABLES
         summary = backfill_listed_f10(
             Path(config.output.warehouse_dir),
             tables=picked,

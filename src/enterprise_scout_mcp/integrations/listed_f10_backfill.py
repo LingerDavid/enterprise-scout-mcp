@@ -31,7 +31,7 @@ from enterprise_scout_mcp.sources.eastmoney_ipo_profile import fetch_ipo_profile
 from enterprise_scout_mcp.sources.eastmoney_segments import fetch_business_segments
 from enterprise_scout_mcp.sources.eastmoney_workforce import fetch_workforce_metrics
 
-_DEFAULT_TABLES = (
+DEFAULT_LISTED_F10_TABLES = (
     "segments",
     "holders",
     "float_holders",
@@ -119,15 +119,26 @@ def _fetch_table(table: str, sym: str, identity_row: dict[str, Any], collected_a
 def backfill_listed_f10(
     warehouse_dir: Path,
     *,
-    tables: tuple[str, ...] = _DEFAULT_TABLES,
+    tables: tuple[str, ...] = DEFAULT_LISTED_F10_TABLES,
     workers: int = 12,
     limit: int | None = None,
+    symbols: tuple[str, ...] | None = None,
     progress_path: Path | None = None,
 ) -> dict[str, Any]:
     """Fetch F10 data for each identity row; write listed parquet tables."""
     warehouse_dir = Path(warehouse_dir)
     collected_at = datetime.now(timezone.utc).isoformat()
     identity = read_identity_rows(warehouse_dir)
+    if symbols:
+        want = {str(s or "").strip().upper() for s in symbols if str(s or "").strip()}
+        filtered: list[dict[str, Any]] = []
+        for row in identity:
+            sid = str(row.get("security_id") or "").strip().upper()
+            sym = to_tradecraft_symbol(sid) or ""
+            code = str(row.get("code") or "").strip()
+            if sid in want or sym in want or code in want or f"{code}.SZ" in want or f"{code}.SH" in want:
+                filtered.append(row)
+        identity = filtered
     if limit is not None:
         identity = identity[: max(0, int(limit))]
 
