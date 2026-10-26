@@ -54,6 +54,12 @@ def _iter_records(path: Path) -> Iterator[dict[str, Any]]:
             yield data
 
 
+def _as_row_list(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [row for row in value if isinstance(row, dict)]
+
+
 def record_to_rows(record: dict[str, Any], *, collected_at: str) -> dict[str, list[dict[str, Any]]]:
     """Split one corpus record into identity / facts / segments rows."""
     issuer_id = str(record.get("issuer_id") or record.get("credit_code") or "").strip()
@@ -90,7 +96,7 @@ def record_to_rows(record: dict[str, Any], *, collected_at: str) -> dict[str, li
         )
 
     facts: list[dict[str, Any]] = []
-    for fact in record.get("facts") or []:
+    for fact in _as_row_list(record.get("facts")):
         if not isinstance(fact, dict):
             continue
         item_code = str(fact.get("item_code") or "").strip()
@@ -118,9 +124,7 @@ def record_to_rows(record: dict[str, Any], *, collected_at: str) -> dict[str, li
         )
 
     segments: list[dict[str, Any]] = []
-    for seg in record.get("segments") or []:
-        if not isinstance(seg, dict):
-            continue
+    for seg in _as_row_list(record.get("segments")):
         name = str(seg.get("name") or "").strip()
         kind = str(seg.get("kind") or "").strip()
         if not name or not kind or not issuer_id or not period:
@@ -143,9 +147,7 @@ def record_to_rows(record: dict[str, Any], *, collected_at: str) -> dict[str, li
         )
 
     holders: list[dict[str, Any]] = []
-    for holder in record.get("holders") or []:
-        if not isinstance(holder, dict):
-            continue
+    for holder in _as_row_list(record.get("holders")):
         holder_name = str(holder.get("holder_name") or holder.get("name") or "").strip()
         as_of = str(holder.get("as_of") or "").strip()
         if not holder_name or not security_id or not as_of:
@@ -169,9 +171,7 @@ def record_to_rows(record: dict[str, Any], *, collected_at: str) -> dict[str, li
         )
 
     subsidiaries: list[dict[str, Any]] = []
-    for sub in record.get("subsidiaries") or []:
-        if not isinstance(sub, dict):
-            continue
+    for sub in _as_row_list(record.get("subsidiaries")):
         name = str(sub.get("name") or "").strip()
         if not name or not issuer_id or not period:
             continue
@@ -189,9 +189,7 @@ def record_to_rows(record: dict[str, Any], *, collected_at: str) -> dict[str, li
         )
 
     listed_control: list[dict[str, Any]] = []
-    for hop in record.get("listed_control") or []:
-        if not isinstance(hop, dict):
-            continue
+    for hop in _as_row_list(record.get("listed_control")):
         src = str(hop.get("src_name") or "").strip()
         dst = str(hop.get("dst_name") or "").strip()
         as_of = str(hop.get("as_of") or document_date or "").strip()[:10]

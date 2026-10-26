@@ -443,6 +443,30 @@ def cmd_corpus_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_corpus_backfill_segments(args: argparse.Namespace) -> int:
+    from enterprise_scout_mcp.config import resolve_project_root
+    from enterprise_scout_mcp.integrations.listed_segments_backfill import backfill_listed_segments
+
+    config = load_config(args.config)
+    root = resolve_project_root()
+
+    def _dir(rel: str) -> Path:
+        p = Path(rel)
+        return p if p.is_absolute() else root / p
+
+    warehouse_dir = _dir(config.output.warehouse_dir)
+    limit = int(args.limit) if int(args.limit) > 0 else None
+    progress = Path(args.progress) if args.progress else None
+    summary = backfill_listed_segments(
+        warehouse_dir,
+        workers=int(args.workers),
+        limit=limit,
+        progress_path=progress,
+    )
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0 if summary.get("segments_written", 0) > 0 else 1
+
+
 def cmd_corpus_import_listed(args: argparse.Namespace) -> int:
     from enterprise_scout_mcp.config import resolve_project_root
     from enterprise_scout_mcp.integrations.listed_corpus import import_listed_corpus
@@ -969,6 +993,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Do not skip symbols that already have corpus+PDF",
     )
     corpus_batch.set_defaults(func=cmd_corpus_sample_listed_batch, corpus_cmd="sample-listed-batch")
+    corpus_segments = corpus_sub.add_parser(
+        "backfill-segments",
+        help="Backfill listed/segments from East Money F10 主营构成",
+    )
+    corpus_segments.add_argument("--workers", type=int, default=12, help="Parallel fetch workers")
+    corpus_segments.add_argument("--limit", type=int, default=0, help="Max symbols (0=all)")
+    corpus_segments.add_argument("--progress", default="", help="Append summary JSONL path")
+    corpus_segments.set_defaults(func=cmd_corpus_backfill_segments, corpus_cmd="backfill-segments")
 
     drain = sub.add_parser("drain-retry", help="Re-run jobs from raw/retry_queue")
     drain.add_argument("--limit", type=int, default=0, help="Max jobs (0 = all)")
