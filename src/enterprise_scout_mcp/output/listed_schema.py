@@ -160,6 +160,29 @@ WORKFORCE_EDUCATION_COLUMNS = (
     "collected_at",
 )
 
+HOLDER_STATS_COLUMNS = (
+    "security_id",
+    "as_of",
+    "holder_count",
+    "holder_count_change_pct",
+    "avg_free_shares",
+    "avg_hold_amt",
+    "document_id",
+    "collected_at",
+)
+
+IPO_PROFILE_COLUMNS = (
+    "security_id",
+    "found_date",
+    "listing_date",
+    "issue_price",
+    "total_issue_num",
+    "par_value",
+    "issue_way",
+    "document_id",
+    "collected_at",
+)
+
 # Profit waterfall order (display). gross_profit may be derived at read time.
 INCOME_ITEM_CODES = (
     "revenue",
@@ -302,3 +325,11 @@ def workforce_row(**fields: Any) -> dict[str, Any]:
 
 def workforce_education_row(**fields: Any) -> dict[str, Any]:
     return _row(WORKFORCE_EDUCATION_COLUMNS, **fields)
+
+
+def holder_stats_row(**fields: Any) -> dict[str, Any]:
+    return _row(HOLDER_STATS_COLUMNS, **fields)
+
+
+def ipo_profile_row(**fields: Any) -> dict[str, Any]:
+    return _row(IPO_PROFILE_COLUMNS, **fields)

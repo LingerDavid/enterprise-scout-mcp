@@ -550,6 +550,17 @@ def cmd_corpus_sync_facts(args: argparse.Namespace) -> int:
     return 0 if report.get("ok") else 1
 
 
+def cmd_listed_probe_f10(args: argparse.Namespace) -> int:
+    from enterprise_scout_mcp.sources.eastmoney_f10_registry import probe_all_f10_tabs
+
+    tabs = tuple(t.strip() for t in args.tab.split(",")) if args.tab else None
+    if tabs == (""):
+        tabs = None
+    report = probe_all_f10_tabs(args.symbol, tabs=tabs)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return 0 if report.get("ok") else 1
+
+
 def cmd_listed_dossier(args: argparse.Namespace) -> int:
     from enterprise_scout_mcp.config import resolve_project_root
     from enterprise_scout_mcp.integrations.listed_dossier import build_listed_dossier
@@ -1144,6 +1155,17 @@ def build_parser() -> argparse.ArgumentParser:
     listed_dossier.add_argument("symbol", help="600519.SH or SSE:600519")
     listed_dossier.add_argument("--no-peers", action="store_true", help="Skip peer comparison tab")
     listed_dossier.set_defaults(func=cmd_listed_dossier, listed_cmd="dossier")
+    listed_probe = listed_sub.add_parser(
+        "probe-f10",
+        help="Probe live East Money F10 PageAjax/datacenter structure per tab",
+    )
+    listed_probe.add_argument("symbol", help="600519.SH or SSE:600519")
+    listed_probe.add_argument(
+        "--tab",
+        default="",
+        help="Comma-separated tab names (default: all). E.g. 股东研究,财务分析",
+    )
+    listed_probe.set_defaults(func=cmd_listed_probe_f10, listed_cmd="probe-f10")
 
     drain = sub.add_parser("drain-retry", help="Re-run jobs from raw/retry_queue")
     drain.add_argument("--limit", type=int, default=0, help="Max jobs (0 = all)")

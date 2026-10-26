@@ -71,9 +71,17 @@ def build_listed_dossier(
         "symbol": to_tradecraft_symbol(security_id) or "",
         "issuer_id": issuer_id,
         "tabs": {
-            "公司概况": identity,
+            "公司概况": {
+                **identity,
+                "ipo_profile": _filter_security(_read_table(warehouse_dir, "ipo_profile"), security_id),
+            },
             "股东研究": {
                 "holders": _filter_security(_read_table(warehouse_dir, "holders"), security_id),
+                "holder_stats": sorted(
+                    _filter_security(_read_table(warehouse_dir, "holder_stats"), security_id),
+                    key=lambda r: str(r.get("as_of") or ""),
+                    reverse=True,
+                ),
                 "control": _filter_issuer(_read_table(warehouse_dir, "listed_control"), issuer_id),
             },
             "经营分析": {

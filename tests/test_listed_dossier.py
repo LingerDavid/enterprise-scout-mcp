@@ -73,6 +73,7 @@ def test_build_listed_dossier_tabs(tmp_path: Path) -> None:
     assert dossier["ok"] is True
     assert dossier["symbol"] == "002271.SZ"
     assert dossier["tabs"]["公司概况"]["issuer_name"] == "东方雨虹"
+    assert dossier["tabs"]["公司概况"]["ipo_profile"] == []
     assert len(dossier["tabs"]["经营分析"]["segments"]) == 1
     assert dossier["tabs"]["员工及业务竞争力"]["workforce"][0]["period"] == "2025"
     assert dossier["tabs"]["员工及业务竞争力"]["workforce"][0]["staff_num"] == "10318"

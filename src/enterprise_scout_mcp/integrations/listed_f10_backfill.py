@@ -17,13 +17,17 @@ from enterprise_scout_mcp.sources.eastmoney_capital import fetch_capital_structu
 from enterprise_scout_mcp.sources.eastmoney_control import fetch_actual_controller
 from enterprise_scout_mcp.sources.eastmoney_dividends import fetch_dividends
 from enterprise_scout_mcp.sources.eastmoney_executives import fetch_executives
+from enterprise_scout_mcp.sources.eastmoney_holder_stats import fetch_holder_stats
 from enterprise_scout_mcp.sources.eastmoney_holders import fetch_top_holders
+from enterprise_scout_mcp.sources.eastmoney_ipo_profile import fetch_ipo_profile
 from enterprise_scout_mcp.sources.eastmoney_segments import fetch_business_segments
 from enterprise_scout_mcp.sources.eastmoney_workforce import fetch_workforce_metrics
 
 _DEFAULT_TABLES = (
     "segments",
     "holders",
+    "holder_stats",
+    "ipo_profile",
     "capital",
     "executives",
     "dividends",
@@ -40,6 +44,12 @@ def _fetch_table(table: str, sym: str, identity_row: dict[str, Any], collected_a
     if table == "holders":
         rows = fetch_top_holders(sym, collected_at=collected_at)
         return {"rows": rows, "skipped": [] if rows else ["empty_sdgd"]}
+    if table == "holder_stats":
+        rep = fetch_holder_stats(sym, collected_at=collected_at)
+        return {"rows": rep.get("holder_stats") or [], "skipped": rep.get("skipped") or []}
+    if table == "ipo_profile":
+        rep = fetch_ipo_profile(sym, collected_at=collected_at)
+        return {"rows": rep.get("ipo_profile") or [], "skipped": rep.get("skipped") or []}
     if table == "capital":
         rep = fetch_capital_structure(sym, collected_at=collected_at)
         return {"rows": rep.get("capital") or [], "skipped": rep.get("skipped") or []}
