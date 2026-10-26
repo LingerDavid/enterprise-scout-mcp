@@ -16,9 +16,12 @@ from enterprise_scout_mcp.output.listed_schema import to_tradecraft_symbol
 from enterprise_scout_mcp.sources.eastmoney_capital import fetch_capital_structure
 from enterprise_scout_mcp.sources.eastmoney_control import fetch_actual_controller
 from enterprise_scout_mcp.sources.eastmoney_dividends import fetch_dividends
+from enterprise_scout_mcp.sources.eastmoney_exec_trades import fetch_exec_holding_changes
 from enterprise_scout_mcp.sources.eastmoney_executives import fetch_executives
+from enterprise_scout_mcp.sources.eastmoney_float_holders import fetch_float_holders
 from enterprise_scout_mcp.sources.eastmoney_holder_stats import fetch_holder_stats
 from enterprise_scout_mcp.sources.eastmoney_holders import fetch_top_holders
+from enterprise_scout_mcp.sources.eastmoney_institutional import fetch_institutional_holdings
 from enterprise_scout_mcp.sources.eastmoney_ipo_profile import fetch_ipo_profile
 from enterprise_scout_mcp.sources.eastmoney_segments import fetch_business_segments
 from enterprise_scout_mcp.sources.eastmoney_workforce import fetch_workforce_metrics
@@ -26,10 +29,13 @@ from enterprise_scout_mcp.sources.eastmoney_workforce import fetch_workforce_met
 _DEFAULT_TABLES = (
     "segments",
     "holders",
+    "float_holders",
     "holder_stats",
+    "institutional_holdings",
     "ipo_profile",
     "capital",
     "executives",
+    "exec_holding_changes",
     "dividends",
     "control",
     "workforce",
@@ -44,6 +50,12 @@ def _fetch_table(table: str, sym: str, identity_row: dict[str, Any], collected_a
     if table == "holders":
         rows = fetch_top_holders(sym, collected_at=collected_at)
         return {"rows": rows, "skipped": [] if rows else ["empty_sdgd"]}
+    if table == "float_holders":
+        rep = fetch_float_holders(sym, collected_at=collected_at)
+        return {"rows": rep.get("float_holders") or [], "skipped": rep.get("skipped") or []}
+    if table == "institutional_holdings":
+        rep = fetch_institutional_holdings(sym, collected_at=collected_at)
+        return {"rows": rep.get("institutional_holdings") or [], "skipped": rep.get("skipped") or []}
     if table == "holder_stats":
         rep = fetch_holder_stats(sym, collected_at=collected_at)
         return {"rows": rep.get("holder_stats") or [], "skipped": rep.get("skipped") or []}
@@ -56,6 +68,9 @@ def _fetch_table(table: str, sym: str, identity_row: dict[str, Any], collected_a
     if table == "executives":
         rep = fetch_executives(sym, collected_at=collected_at)
         return {"rows": rep.get("executives") or [], "skipped": rep.get("skipped") or []}
+    if table == "exec_holding_changes":
+        rep = fetch_exec_holding_changes(sym, collected_at=collected_at)
+        return {"rows": rep.get("exec_holding_changes") or [], "skipped": rep.get("skipped") or []}
     if table == "dividends":
         rep = fetch_dividends(sym, collected_at=collected_at)
         return {"rows": rep.get("dividends") or [], "skipped": rep.get("skipped") or []}

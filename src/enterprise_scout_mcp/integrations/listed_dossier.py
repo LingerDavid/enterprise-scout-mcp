@@ -77,6 +77,12 @@ def build_listed_dossier(
             },
             "股东研究": {
                 "holders": _filter_security(_read_table(warehouse_dir, "holders"), security_id),
+                "float_holders": _filter_security(_read_table(warehouse_dir, "float_holders"), security_id),
+                "institutional_holdings": sorted(
+                    _filter_security(_read_table(warehouse_dir, "institutional_holdings"), security_id),
+                    key=lambda r: str(r.get("as_of") or ""),
+                    reverse=True,
+                ),
                 "holder_stats": sorted(
                     _filter_security(_read_table(warehouse_dir, "holder_stats"), security_id),
                     key=lambda r: str(r.get("as_of") or ""),
@@ -110,6 +116,11 @@ def build_listed_dossier(
             },
             "公司高管": {
                 "executives": _filter_security(_read_table(warehouse_dir, "executives"), security_id),
+                "holding_changes": sorted(
+                    _filter_security(_read_table(warehouse_dir, "exec_holding_changes"), security_id),
+                    key=lambda r: str(r.get("as_of") or ""),
+                    reverse=True,
+                ),
             },
             "子公司": {
                 "subsidiaries": _filter_issuer(_read_table(warehouse_dir, "subsidiaries"), issuer_id),

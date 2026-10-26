@@ -183,6 +183,47 @@ IPO_PROFILE_COLUMNS = (
     "collected_at",
 )
 
+FLOAT_HOLDERS_COLUMNS = (
+    "security_id",
+    "as_of",
+    "rank",
+    "holder_name",
+    "holder_type",
+    "shares",
+    "pct_float",
+    "share_class",
+    "change_shares",
+    "change_pct",
+    "document_id",
+    "collected_at",
+)
+
+INSTITUTIONAL_HOLDINGS_COLUMNS = (
+    "security_id",
+    "as_of",
+    "org_type",
+    "org_count",
+    "total_free_shares",
+    "pct_float",
+    "pct_total",
+    "document_id",
+    "collected_at",
+)
+
+EXEC_HOLDING_CHANGES_COLUMNS = (
+    "security_id",
+    "as_of",
+    "person_name",
+    "position",
+    "change_shares",
+    "avg_price",
+    "shares_after",
+    "trade_way",
+    "holder_name",
+    "document_id",
+    "collected_at",
+)
+
 # Profit waterfall order (display). gross_profit may be derived at read time.
 INCOME_ITEM_CODES = (
     "revenue",
@@ -333,3 +374,15 @@ def holder_stats_row(**fields: Any) -> dict[str, Any]:
 
 def ipo_profile_row(**fields: Any) -> dict[str, Any]:
     return _row(IPO_PROFILE_COLUMNS, **fields)
+
+
+def float_holders_row(**fields: Any) -> dict[str, Any]:
+    return _row(FLOAT_HOLDERS_COLUMNS, **fields)
+
+
+def institutional_holding_row(**fields: Any) -> dict[str, Any]:
+    return _row(INSTITUTIONAL_HOLDINGS_COLUMNS, **fields)
+
+
+def exec_holding_change_row(**fields: Any) -> dict[str, Any]:
+    return _row(EXEC_HOLDING_CHANGES_COLUMNS, **fields)

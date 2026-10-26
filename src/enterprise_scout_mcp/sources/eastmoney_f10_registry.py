@@ -35,10 +35,12 @@ F10_TABS: tuple[F10TabSpec, ...] = (
         page_module="ShareholderResearch",
         mapped_page_keys={
             "sdgd": "holders",
+            "sdltgd": "float_holders",
             "sjkzr": "listed_control",
             "gdrs": "holder_stats",
+            "jgcc": "institutional_holdings",
         },
-        notes="sdltgd/jgcc/jjcq/ltgf unmapped",
+        notes="jjcg (基金持股)/ltgf unmapped",
     ),
     F10TabSpec(
         tab="经营分析",
@@ -78,8 +80,7 @@ F10_TABS: tuple[F10TabSpec, ...] = (
     F10TabSpec(
         tab="公司高管",
         page_module="CompanyManagement",
-        mapped_page_keys={"gglb": "executives"},
-        notes="cgbd (持股变动) unmapped",
+        mapped_page_keys={"gglb": "executives", "cgbd": "exec_holding_changes"},
     ),
     F10TabSpec(
         tab="同行比较",

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from enterprise_scout_mcp.sources.eastmoney_exec_trades import exec_trades_from_f10_payload
 from enterprise_scout_mcp.sources.eastmoney_f10_probe import summarize_page_ajax_payload
+from enterprise_scout_mcp.sources.eastmoney_float_holders import float_holders_from_f10_payload
 from enterprise_scout_mcp.sources.eastmoney_holder_stats import holder_stats_from_f10_payload
+from enterprise_scout_mcp.sources.eastmoney_institutional import institutional_from_f10_payload
 from enterprise_scout_mcp.sources.eastmoney_ipo_profile import ipo_profile_from_f10_payload
 
 
@@ -39,6 +42,71 @@ def test_holder_stats_from_gdrs() -> None:
     assert len(rows) == 1
     assert rows[0]["holder_count"] == "120000"
     assert rows[0]["as_of"] == "2025-12-31"
+
+
+def test_float_holders_from_sdltgd() -> None:
+    rows = float_holders_from_f10_payload(
+        {
+            "sdltgd": [
+                {
+                    "END_DATE": "2025-12-31",
+                    "HOLDER_RANK": 1,
+                    "HOLDER_NAME": "香港中央结算",
+                    "HOLDER_TYPE": "其它",
+                    "HOLD_NUM": 1000,
+                    "FREE_HOLDNUM_RATIO": 5.5,
+                }
+            ]
+        },
+        security_id="SZSE:002271",
+        collected_at="t0",
+    )
+    assert rows[0]["holder_name"] == "香港中央结算"
+    assert rows[0]["pct_float"] == "5.5"
+
+
+def test_institutional_from_jgcc() -> None:
+    rows = institutional_from_f10_payload(
+        {
+            "jgcc": [
+                {
+                    "REPORT_DATE": "2025-12-31",
+                    "ORG_TYPE": "基金",
+                    "TOTAL_ORG_NUM": 120,
+                    "TOTAL_FREE_SHARES": 50000000,
+                    "TOTAL_SHARES_RATIO": 10.2,
+                    "ALL_SHARES_RATIO": 8.1,
+                }
+            ]
+        },
+        security_id="SZSE:002271",
+        collected_at="t0",
+    )
+    assert rows[0]["org_type"] == "基金"
+    assert rows[0]["org_count"] == "120"
+
+
+def test_exec_trades_from_cgbd() -> None:
+    rows = exec_trades_from_f10_payload(
+        {
+            "cgbd": [
+                {
+                    "END_DATE": "2025-06-01",
+                    "EXECUTIVE_NAME": "张三",
+                    "POSITION": "董事长",
+                    "CHANGE_NUM": 10000,
+                    "AVERAGE_PRICE": 12.5,
+                    "CHANGE_AFTER_HOLDNUM": 50000,
+                    "TRADE_WAY": "竞价交易",
+                    "HOLDER_NAME": "张三",
+                }
+            ]
+        },
+        security_id="SZSE:002271",
+        collected_at="t0",
+    )
+    assert rows[0]["person_name"] == "张三"
+    assert rows[0]["change_shares"] == "10000.0"
 
 
 def test_ipo_profile_from_fxxg() -> None:

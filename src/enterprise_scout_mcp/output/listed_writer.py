@@ -15,7 +15,10 @@ from enterprise_scout_mcp.output.listed_schema import (
     LISTED_CONTROL_COLUMNS,
     SEGMENTS_COLUMNS,
     SUBSIDIARIES_COLUMNS,
+    EXEC_HOLDING_CHANGES_COLUMNS,
+    FLOAT_HOLDERS_COLUMNS,
     HOLDER_STATS_COLUMNS,
+    INSTITUTIONAL_HOLDINGS_COLUMNS,
     IPO_PROFILE_COLUMNS,
     WORKFORCE_COLUMNS,
     WORKFORCE_EDUCATION_COLUMNS,
@@ -34,6 +37,9 @@ _TABLE_COLUMNS: dict[str, tuple[str, ...]] = {
     "workforce_education": WORKFORCE_EDUCATION_COLUMNS,
     "holder_stats": HOLDER_STATS_COLUMNS,
     "ipo_profile": IPO_PROFILE_COLUMNS,
+    "float_holders": FLOAT_HOLDERS_COLUMNS,
+    "institutional_holdings": INSTITUTIONAL_HOLDINGS_COLUMNS,
+    "exec_holding_changes": EXEC_HOLDING_CHANGES_COLUMNS,
 }
 
 
