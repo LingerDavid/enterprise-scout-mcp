@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from enterprise_scout_mcp.output.listed_schema import dividend_summary_row, seo_issue_row
+from enterprise_scout_mcp.output.listed_schema import allotment_issue_row, dividend_summary_row, seo_issue_row
 from enterprise_scout_mcp.sources.eastmoney_common import date_str, em_code, fetch_f10_page
 
 
@@ -96,6 +96,40 @@ def seo_issues_from_f10_payload(
     return out
 
 
+def allotment_issues_from_f10_payload(
+    payload: dict[str, Any],
+    *,
+    security_id: str,
+    document_id: str = "",
+    collected_at: str = "",
+) -> list[dict[str, Any]]:
+    items = payload.get("pgmx") if isinstance(payload, dict) else None
+    if not isinstance(items, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        notice = date_str(item.get("NOTICE_DATE"))
+        if not notice:
+            continue
+        out.append(
+            allotment_issue_row(
+                security_id=security_id,
+                notice_date=notice,
+                issue_num=_int_str(item.get("ISSUE_NUM")),
+                issue_price=_finite(item.get("ISSUE_PRICE")),
+                total_raise_funds=_finite(item.get("TOTAL_RAISE_FUNDS")),
+                equity_record_date=date_str(item.get("EQUITY_RECORD_DATE")),
+                ex_dividend_date=date_str(item.get("EX_DIVIDEND_DATEE") or item.get("EX_DIVIDEND_DATE")),
+                event_explain=str(item.get("EVENT_EXPLAIN") or "").strip(),
+                document_id=document_id or f"eastmoney:f10:pgmx:{security_id}:{notice}",
+                collected_at=collected_at,
+            )
+        )
+    return out
+
+
 def fetch_bonus_extras(
     symbol_or_security: str,
     *,
@@ -108,6 +142,7 @@ def fetch_bonus_extras(
         return {
             "dividend_summary": [],
             "seo_issues": [],
+            "allotment_issues": [],
             "skipped": ["unresolved_symbol"],
         }
     _em, security_id = parsed
@@ -126,14 +161,23 @@ def fetch_bonus_extras(
         document_id=document_id,
         collected_at=collected_at,
     )
+    allotment = allotment_issues_from_f10_payload(
+        payload,
+        security_id=security_id,
+        document_id=document_id,
+        collected_at=collected_at,
+    )
     skipped: list[str] = []
     if not summary:
         skipped.append("empty_lnfhrz")
     if not seo:
         skipped.append("empty_zfmx")
+    if not allotment:
+        skipped.append("empty_pgmx")
     return {
         "security_id": security_id,
         "dividend_summary": summary,
         "seo_issues": seo,
+        "allotment_issues": allotment,
         "skipped": skipped,
     }

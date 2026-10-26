@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from enterprise_scout_mcp.sources.eastmoney_bonus_extras import (
+    allotment_issues_from_f10_payload,
     dividend_summary_from_f10_payload,
     seo_issues_from_f10_payload,
 )
+from enterprise_scout_mcp.sources.eastmoney_restricted_unlock import restricted_unlock_from_f10_payload
 from enterprise_scout_mcp.sources.eastmoney_capital_history import capital_history_from_f10_payload
 from enterprise_scout_mcp.sources.eastmoney_exec_trades import exec_trades_from_f10_payload
 from enterprise_scout_mcp.sources.eastmoney_float_share_mix import float_share_mix_from_f10_payload
@@ -112,6 +114,43 @@ def test_float_share_mix_from_ltgf() -> None:
     )
     assert rows[0]["limited_shares"] == "100"
     assert rows[0]["unlimited_pct"] == "90.0"
+
+
+def test_allotment_and_restricted_unlock() -> None:
+    allotment = allotment_issues_from_f10_payload(
+        {
+            "pgmx": [
+                {
+                    "NOTICE_DATE": "2019-05-01",
+                    "ISSUE_NUM": 100,
+                    "ISSUE_PRICE": 10.5,
+                    "TOTAL_RAISE_FUNDS": 1000,
+                    "EQUITY_RECORD_DATE": "2019-05-10",
+                    "EX_DIVIDEND_DATEE": "2019-05-08",
+                    "EVENT_EXPLAIN": "配股",
+                }
+            ]
+        },
+        security_id="SZSE:000001",
+        collected_at="t0",
+    )
+    unlock = restricted_unlock_from_f10_payload(
+        {
+            "xsjj": [
+                {
+                    "LIFT_DATE": "2026-01-01",
+                    "LIFT_NUM": 5000000,
+                    "LIFT_TYPE": "首发原股东",
+                    "TOTAL_SHARES_RATIO": 1.2,
+                    "UNLIMITED_A_SHARES_RATIO": 1.5,
+                }
+            ]
+        },
+        security_id="SZSE:688981",
+        collected_at="t0",
+    )
+    assert allotment[0]["issue_price"] == "10.5"
+    assert unlock[0]["lift_shares"] == "5000000"
 
 
 def test_dividend_summary_and_seo_issues() -> None:

@@ -56,7 +56,7 @@ F10_TABS: tuple[F10TabSpec, ...] = (
             "RPT_F10_FINANCE_GCASHFLOW": "workforce.pay_staff_cash",
             "RPT_F10_FINANCE_GBALANCE": "workforce.staff_salary_payable",
         },
-        notes="education mix not exposed on datacenter; workforce_education reserved",
+        notes="education mix via annual_pdf → listed/workforce_education when section present",
     ),
     F10TabSpec(
         tab="财务分析",
@@ -84,6 +84,7 @@ F10_TABS: tuple[F10TabSpec, ...] = (
             "gbjg": "capital",
             "gbgc": "capital_history",
             "lngbbd": "capital_history",
+            "xsjj": "restricted_unlock",
         },
         notes="xsjj (限售解禁) often empty per symbol",
     ),

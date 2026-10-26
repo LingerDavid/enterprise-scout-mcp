@@ -98,6 +98,7 @@ class EquityExtractResult:
     listed_control: list[dict[str, Any]] = field(default_factory=list)
     suppliers: list[dict[str, Any]] = field(default_factory=list)
     investments: list[dict[str, Any]] = field(default_factory=list)
+    workforce_education: list[dict[str, Any]] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
     page_hits: dict[str, list[int]] = field(default_factory=dict)
 
@@ -840,6 +841,24 @@ def extract_equity_from_pages(
     if not issuer_id:
         result.skipped.append("no_issuer_for_control")
     else:
+        from enterprise_scout_mcp.sources.annual_workforce_pdf import education_buckets_from_pages
+
+        edu_pages = [p.text for p in pages if p.text]
+        edu_rows = education_buckets_from_pages(
+            edu_pages,
+            issuer_id=issuer_id,
+            as_of=as_of or f"{period}-12-31",
+            document_id=document_id,
+            collected_at=collected_at,
+        )
+        if edu_rows:
+            result.workforce_education = edu_rows
+            result.page_hits["workforce_education"] = [
+                p.index for p in pages if p.text and ("学历" in p.text or "员工" in p.text)
+            ]
+        else:
+            result.skipped.append("no_workforce_education")
+
         control, ctrl_skipped, ctrl_pages = _extract_control_from_text(
             pages,
             issuer_id=issuer_id,

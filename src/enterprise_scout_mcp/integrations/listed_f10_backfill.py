@@ -19,6 +19,7 @@ from enterprise_scout_mcp.sources.eastmoney_capital_history import fetch_capital
 from enterprise_scout_mcp.sources.eastmoney_control import fetch_actual_controller
 from enterprise_scout_mcp.sources.eastmoney_dividends import fetch_dividends
 from enterprise_scout_mcp.sources.eastmoney_float_share_mix import fetch_float_share_mix
+from enterprise_scout_mcp.sources.eastmoney_restricted_unlock import fetch_restricted_unlock
 from enterprise_scout_mcp.sources.eastmoney_exec_trades import fetch_exec_holding_changes
 from enterprise_scout_mcp.sources.eastmoney_fund_holdings import fetch_fund_holdings
 from enterprise_scout_mcp.sources.eastmoney_executives import fetch_executives
@@ -46,6 +47,8 @@ _DEFAULT_TABLES = (
     "dividends",
     "dividend_summary",
     "seo_issues",
+    "allotment_issues",
+    "restricted_unlock",
     "control",
     "workforce",
 )
@@ -98,6 +101,12 @@ def _fetch_table(table: str, sym: str, identity_row: dict[str, Any], collected_a
     if table == "seo_issues":
         rep = fetch_bonus_extras(sym, collected_at=collected_at)
         return {"rows": rep.get("seo_issues") or [], "skipped": rep.get("skipped") or []}
+    if table == "allotment_issues":
+        rep = fetch_bonus_extras(sym, collected_at=collected_at)
+        return {"rows": rep.get("allotment_issues") or [], "skipped": rep.get("skipped") or []}
+    if table == "restricted_unlock":
+        rep = fetch_restricted_unlock(sym, collected_at=collected_at)
+        return {"rows": rep.get("restricted_unlock") or [], "skipped": rep.get("skipped") or []}
     if table == "control":
         rep = fetch_actual_controller(sym, issuer_id=issuer_id, collected_at=collected_at)
         return {"rows": rep.get("control") or [], "skipped": rep.get("skipped") or []}

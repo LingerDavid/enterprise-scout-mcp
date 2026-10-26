@@ -46,6 +46,7 @@ def upsert_equity_to_warehouse(
     holders: list[dict[str, Any]],
     subsidiaries: list[dict[str, Any]],
     listed_control: list[dict[str, Any]],
+    workforce_education: list[dict[str, Any]] | None = None,
 ) -> dict[str, str | None]:
     """Idempotent replace into listed parquet tables."""
     wh = Path(warehouse_dir)
@@ -53,6 +54,7 @@ def upsert_equity_to_warehouse(
         "holders": None,
         "subsidiaries": None,
         "listed_control": None,
+        "workforce_education": None,
     }
     if holders:
         p = replace_listed_rows(wh, "holders", holders, match_keys=HOLDERS_MATCH_KEYS)
@@ -67,6 +69,14 @@ def upsert_equity_to_warehouse(
             wh, "listed_control", listed_control, match_keys=CONTROL_MATCH_KEYS
         )
         paths["listed_control"] = str(p) if p else None
+    if workforce_education:
+        p = replace_listed_rows(
+            wh,
+            "workforce_education",
+            workforce_education,
+            match_keys=("issuer_id", "as_of", "bucket"),
+        )
+        paths["workforce_education"] = str(p) if p else None
     return paths
 
 
@@ -580,6 +590,7 @@ def extract_and_store_equity(
             holders=result.holders,
             subsidiaries=result.subsidiaries,
             listed_control=result.listed_control,
+            workforce_education=result.workforce_education,
         )
         edge_path = upsert_annual_edges_to_warehouse(
             Path(warehouse_dir),

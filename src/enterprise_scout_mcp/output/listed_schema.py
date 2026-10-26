@@ -264,6 +264,30 @@ SEO_ISSUE_COLUMNS = (
     "collected_at",
 )
 
+ALLOTMENT_ISSUE_COLUMNS = (
+    "security_id",
+    "notice_date",
+    "issue_num",
+    "issue_price",
+    "total_raise_funds",
+    "equity_record_date",
+    "ex_dividend_date",
+    "event_explain",
+    "document_id",
+    "collected_at",
+)
+
+RESTRICTED_UNLOCK_COLUMNS = (
+    "security_id",
+    "lift_date",
+    "lift_shares",
+    "lift_type",
+    "pct_total",
+    "pct_float_a",
+    "document_id",
+    "collected_at",
+)
+
 CAPITAL_HISTORY_COLUMNS = (
     "security_id",
     "as_of",
@@ -474,3 +498,11 @@ def seo_issue_row(**fields: Any) -> dict[str, Any]:
 
 def capital_history_row(**fields: Any) -> dict[str, Any]:
     return _row(CAPITAL_HISTORY_COLUMNS, **fields)
+
+
+def allotment_issue_row(**fields: Any) -> dict[str, Any]:
+    return _row(ALLOTMENT_ISSUE_COLUMNS, **fields)
+
+
+def restricted_unlock_row(**fields: Any) -> dict[str, Any]:
+    return _row(RESTRICTED_UNLOCK_COLUMNS, **fields)

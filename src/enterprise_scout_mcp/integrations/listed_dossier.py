@@ -126,12 +126,22 @@ def build_listed_dossier(
                     key=lambda r: str(r.get("notice_date") or ""),
                     reverse=True,
                 ),
+                "allotment_issues": sorted(
+                    _filter_security(_read_table(warehouse_dir, "allotment_issues"), security_id),
+                    key=lambda r: str(r.get("notice_date") or ""),
+                    reverse=True,
+                ),
             },
             "股本结构": {
                 "capital": _filter_security(_read_table(warehouse_dir, "capital"), security_id),
                 "capital_history": sorted(
                     _filter_security(_read_table(warehouse_dir, "capital_history"), security_id),
                     key=lambda r: str(r.get("as_of") or ""),
+                    reverse=True,
+                ),
+                "restricted_unlock": sorted(
+                    _filter_security(_read_table(warehouse_dir, "restricted_unlock"), security_id),
+                    key=lambda r: str(r.get("lift_date") or ""),
                     reverse=True,
                 ),
             },
