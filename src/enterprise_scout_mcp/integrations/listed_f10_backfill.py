@@ -187,6 +187,20 @@ def backfill_listed_f10(
             "merge_drop_key": drop_key,
             "merge_drop_count": len(drop_values),
         }
+        if progress_path is not None:
+            progress_path.parent.mkdir(parents=True, exist_ok=True)
+            with progress_path.open("a", encoding="utf-8") as fh:
+                fh.write(
+                    json.dumps(
+                        {
+                            "table": table,
+                            "finished_at": datetime.now(timezone.utc).isoformat(),
+                            **summary["results"][table],
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
 
     summary["finished_at"] = datetime.now(timezone.utc).isoformat()
     if progress_path is not None:

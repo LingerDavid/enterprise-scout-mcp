@@ -124,6 +124,7 @@ def sample_listed_disclosure(
     holders: list[dict[str, Any]] = []
     subsidiaries: list[dict[str, Any]] = []
     listed_control: list[dict[str, Any]] = []
+    workforce_education: list[dict[str, Any]] = []
     suppliers: list[dict[str, Any]] = []
     investments: list[dict[str, Any]] = []
     annual_edges: list[dict[str, Any]] = []
@@ -146,6 +147,7 @@ def sample_listed_disclosure(
             "holders": len(extracted.holders),
             "subsidiaries": len(extracted.subsidiaries),
             "listed_control": len(extracted.listed_control),
+            "workforce_education": len(extracted.workforce_education),
             "suppliers": len(extracted.suppliers),
             "investments": len(extracted.investments),
             "skipped": list(extracted.skipped),
@@ -157,6 +159,7 @@ def sample_listed_disclosure(
             holders_feed = "annual_pdf"
         subsidiaries = extracted.subsidiaries
         listed_control = extracted.listed_control
+        workforce_education = extracted.workforce_education
         suppliers = extracted.suppliers
         investments = extracted.investments
         annual_edges = edges_from_equity_extract(
@@ -303,6 +306,7 @@ def sample_listed_disclosure(
             holders=holders,
             subsidiaries=subsidiaries,
             listed_control=listed_control,
+            workforce_education=workforce_education,
         )
         if issuer_name and annual_edges:
             upsert_annual_edges_to_warehouse(
